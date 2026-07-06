@@ -35,4 +35,16 @@ describe('loadConfig', () => {
   it('throws ConfigError when the environment is empty', () => {
     expect(() => loadConfig({})).toThrow(ConfigError);
   });
+
+  it('throws ConfigError when the bot user id is not a snowflake', () => {
+    expect(() =>
+      loadConfig({ CROW_BOT_USER_ID: 'not-a-snowflake', CROW_BOT_TOKEN: 'secret-token' }),
+    ).toThrow(ConfigError);
+  });
+
+  it('throws ConfigError when the bot token contains whitespace', () => {
+    expect(() =>
+      loadConfig({ CROW_BOT_USER_ID: '123456789012345678', CROW_BOT_TOKEN: 'bad token' }),
+    ).toThrow(ConfigError);
+  });
 });
