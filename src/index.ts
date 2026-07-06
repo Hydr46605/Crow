@@ -3,8 +3,9 @@
 import 'dotenv/config';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ConfigError, loadConfig } from './config.js';
+import { BOT_TOKEN_VAR, loadConfig } from './config.js';
 import { DiscordClient } from './discord/client.js';
+import { redactSecrets } from './security/redact.js';
 import { createServer } from './server.js';
 
 const run = async (): Promise<void> => {
@@ -25,11 +26,9 @@ const run = async (): Promise<void> => {
 };
 
 run().catch((error: unknown) => {
-  // stderr is safe here; stdout is reserved for the MCP protocol.
-  if (error instanceof ConfigError) {
-    console.error(`[crow] ${error.message}`);
-  } else {
-    console.error('[crow] failed to start:', error);
-  }
+  // stderr is safe here; stdout is reserved for the MCP protocol. Never log the token.
+  const token = process.env[BOT_TOKEN_VAR] ?? '';
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[crow] ${redactSecrets(message, [token])}`);
   process.exit(1);
 });

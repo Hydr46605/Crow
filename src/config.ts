@@ -1,3 +1,5 @@
+import { SNOWFLAKE_PATTERN } from './discord/snowflake.js';
+
 export interface CrowConfig {
   /** Snowflake user ID of the bot account Crow acts as. */
   readonly botUserId: string;
@@ -19,7 +21,8 @@ export class ConfigError extends Error {
  * Reads and validates Crow configuration from the environment.
  *
  * This is the single source of truth for how credentials reach the rest of the
- * application. It fails fast with an actionable message when a value is missing.
+ * application. It fails fast with an actionable message when a value is missing
+ * or malformed, and never logs the token.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CrowConfig {
   const botUserId = env[BOT_USER_ID_VAR]?.trim();
@@ -35,6 +38,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CrowConfig {
       `Missing required environment variable(s): ${missing.join(', ')}. ` +
         'Copy .env.example to .env and set your Discord bot credentials.',
     );
+  }
+
+  if (!SNOWFLAKE_PATTERN.test(botUserId)) {
+    throw new ConfigError(`${BOT_USER_ID_VAR} must be a Discord snowflake ID (17-20 digits).`);
+  }
+
+  if (/\s/.test(botToken)) {
+    throw new ConfigError(`${BOT_TOKEN_VAR} must not contain whitespace.`);
   }
 
   return { botUserId, botToken };
