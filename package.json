@@ -1,0 +1,55 @@
+{
+  "name": "crow",
+  "version": "0.1.0",
+  "description": "An MCP server exposing extensive Discord capabilities to AI agents.",
+  "author": "Hydr46605 <https://github.com/Hydr46605>",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hydr46605/Crow.git"
+  },
+  "homepage": "https://github.com/Hydr46605/Crow#readme",
+  "bugs": {
+    "url": "https://github.com/Hydr46605/Crow/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "discord",
+    "ai",
+    "agents",
+    "bots"
+  ],
+  "bin": {
+    "crow": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "discord.js": "^14.27.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "tsx": "^4.23.12",
+    "typescript": "^5.5.4",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 0.2.0)'
+        required: true
+        type: string
+      dry-run:
+        description: 'Dry run (no publish)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Set version
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Generate changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD)
+            COMPARE_FROM=$(git rev-list --max-parents=0 HEAD | head -1)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "$LAST_TAG"..HEAD)
+            COMPARE_FROM=$LAST_TAG
+          fi
+          FEATURES=$(echo "$COMMITS" | grep -iE '^[^a-z]*feat' || true)
+          FIXES=$(echo "$COMMITS" | grep -iE '^[^a-z]*fix' || true)
+          OTHER=$(echo "$COMMITS" | grep -ivE '^[^a-z]*(feat|fix|BREAKING)' || true)
+          {
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$FEATURES" ]; then
+              echo "### ✨ Features"
+              echo "$FEATURES"
+              echo ""
+            fi
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+            if [ -n "$OTHER" ]; then
+              echo "### 📦 Other Changes"
+              echo "$OTHER"
+              echo ""
+            fi
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${COMPARE_FROM}...v${{ steps.version.outputs.version }}"
+          } > CHANGELOG_BODY.md
+          cat CHANGELOG_BODY.md
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+          if [ ! -f CHANGELOG.md ]; then
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+          {
+            echo "## v${VERSION} (${DATE})"
+            echo ""
+            cat CHANGELOG_BODY.md
+            echo ""
+            tail -n +3 CHANGELOG.md
+          } > CHANGELOG_NEW.md
+          mv CHANGELOG_NEW.md CHANGELOG.md
+          cat CHANGELOG.md
+
+      - name: Commit and tag
+        run: |
+          git add -A
+          git commit -m "release: v${{ steps.version.outputs.version }}" || echo "Nothing to commit"
+          git tag "v${{ steps.version.outputs.version }}" --force
+
+      - name: Push
+        run: |
+          git push || true
+          git push --tags --force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body_path: CHANGELOG_BODY.md
+          draft: false
+          prerelease: ${{ startsWith(steps.version.outputs.version, '0.') }}
+
+      - name: Publish to npm
+        if: inputs.dry-run != true
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
