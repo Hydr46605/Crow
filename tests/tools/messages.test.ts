@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
-import { readMessages, sendMessage, summarizeMessage } from '../../src/tools/messages.js';
+import {
+  deleteMessage,
+  editMessage,
+  readMessages,
+  sendMessage,
+  summarizeMessage,
+} from '../../src/tools/messages.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
 const rawMessage = {
@@ -73,18 +79,51 @@ describe('sendMessage', () => {
 
     expect(captured?.options.body).toEqual({ content: 'hi' });
   });
+});
 
-  it('returns an error result when the request fails', async () => {
-    const discord = new DiscordClient('token', async () => {
-      throw new Error('boom');
+describe('editMessage', () => {
+  it('patches the message content', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawMessage;
     });
 
-    const result = await sendMessage(
-      { channelId: '123456789012345678', content: 'hi' },
+    await editMessage(
+      { channelId: '1', messageId: '9', content: 'updated' },
       createContext(discord),
     );
 
+    expect(captured?.m).toBe('PATCH');
+    expect(captured?.r).toBe('/channels/1/messages/9');
+    expect(captured?.o.body).toEqual({ content: 'updated' });
+  });
+});
+
+describe('deleteMessage', () => {
+  it('requires consent', async () => {
+    const discord = new DiscordClient('token', async () => {
+      throw new Error('should not run');
+    });
+    const result = await deleteMessage({ channelId: '1', messageId: '9' }, createContext(discord));
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('boom');
+    expect(textOf(result)).toContain('consent');
+  });
+
+  it('deletes with consent', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return null;
+    });
+
+    const result = await deleteMessage(
+      { channelId: '1', messageId: '9', confirm: true },
+      createContext(discord),
+    );
+
+    expect(captured?.m).toBe('DELETE');
+    expect(captured?.r).toBe('/channels/1/messages/9');
+    expect(textOf(result)).toContain('Deleted message 9');
   });
 });

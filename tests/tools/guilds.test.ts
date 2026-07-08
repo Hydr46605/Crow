@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
-import { getGuild, listGuilds, summarizeGuild } from '../../src/tools/guilds.js';
+import { getGuild, listGuilds, modifyGuild, summarizeGuild } from '../../src/tools/guilds.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
 const rawGuild = {
@@ -57,5 +57,24 @@ describe('getGuild', () => {
     expect(captured?.method).toBe('GET');
     expect(captured?.route).toBe('/guilds/123456789012345678');
     expect(captured?.options).toEqual({ query: { with_counts: true } });
+  });
+});
+
+describe('modifyGuild', () => {
+  it('sends only the provided fields', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawGuild;
+    });
+
+    await modifyGuild(
+      { guildId: 'g', description: 'new desc', rulesChannelId: '777' },
+      createContext(discord),
+    );
+
+    expect(captured?.m).toBe('PATCH');
+    expect(captured?.r).toBe('/guilds/g');
+    expect(captured?.o.body).toEqual({ description: 'new desc', rules_channel_id: '777' });
   });
 });
