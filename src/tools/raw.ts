@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
-import { toErrorMessage, type HttpMethod } from '../discord/client.js';
+import type { HttpMethod } from '../discord/client.js';
+import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
 
 const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -28,16 +29,17 @@ export interface RawRequestArgs {
 }
 
 export const rawRequest = async (args: RawRequestArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  try {
-    const response = await ctx.discord.request<unknown>(args.method, args.route, {
+  const result = await attempt(() =>
+    ctx.discord.request<unknown>(args.method, args.route, {
       body: args.body,
       query: args.query,
       reason: args.reason,
-    });
-    return textResult(typeof response === 'string' ? response : JSON.stringify(response, null, 2));
-  } catch (error) {
-    return errorResult(toErrorMessage(error));
-  }
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+
+  const response = result.value;
+  return textResult(typeof response === 'string' ? response : JSON.stringify(response, null, 2));
 };
 
 export const registerRawTool = (server: McpServer, ctx: CrowContext): void => {

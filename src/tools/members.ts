@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
-import { toErrorMessage } from '../discord/client.js';
+import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
 import { snowflake } from './schemas.js';
 
@@ -65,27 +65,25 @@ export const summarizeMember = (member: RawMember): MemberSummary => ({
   pending: member.pending,
 });
 
-export const listMembers = async (args: ListMembersArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  try {
-    const members = await ctx.discord.request<RawMember[]>('GET', `/guilds/${args.guildId}/members`, {
+export const listMembers = async (
+  args: ListMembersArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt(() =>
+    ctx.discord.request<RawMember[]>('GET', `/guilds/${args.guildId}/members`, {
       query: { limit: args.limit, after: args.after, query: args.query },
-    });
-    return textResult(JSON.stringify(members.map(summarizeMember), null, 2));
-  } catch (error) {
-    return errorResult(toErrorMessage(error));
-  }
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(result.value.map(summarizeMember), null, 2));
 };
 
 export const getMember = async (args: GetMemberArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  try {
-    const member = await ctx.discord.request<RawMember>(
-      'GET',
-      `/guilds/${args.guildId}/members/${args.userId}`,
-    );
-    return textResult(JSON.stringify(summarizeMember(member), null, 2));
-  } catch (error) {
-    return errorResult(toErrorMessage(error));
-  }
+  const result = await attempt(() =>
+    ctx.discord.request<RawMember>('GET', `/guilds/${args.guildId}/members/${args.userId}`),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(summarizeMember(result.value), null, 2));
 };
 
 export const registerMemberTools = (server: McpServer, ctx: CrowContext): void => {
