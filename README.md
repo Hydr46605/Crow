@@ -4,8 +4,8 @@ A Discord toolkit for AI agents.
 
 Crow is an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server built on the
 [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk). It gives AI
-agents first-class access to Discord — guild and member discovery, messaging, and arbitrary REST
-calls — through a small set of typed, consent-aware tools.
+agents first-class access to Discord — discovery, messaging, channels, moderation, and arbitrary
+REST calls — through a small set of typed, consent-aware tools.
 
 ## Links
 
@@ -18,8 +18,8 @@ calls — through a small set of typed, consent-aware tools.
 
 Crow is a single-purpose MCP server that bridges an AI agent and a Discord bot account. Configure it
 once with a bot `userId` and `token`, connect it to any MCP client, and the agent can discover the
-guilds and members it has access to, then read and send messages or fall back to raw Discord REST
-calls for edge cases.
+guilds, members, and channels it has access to, then read and send messages, manage channels, apply
+consent-gated moderation, and fall back to raw Discord REST calls for edge cases.
 
 Crow is deliberately small and convention-driven. Each capability is a self-contained tool module
 registered through a single registry, so adding a Discord feature is a matter of writing one file
@@ -27,27 +27,30 @@ and registering it.
 
 ## Capabilities
 
-- **Discovery** — list guilds and members so the agent can select its target.
-- **Messaging** — read and send messages.
+- **Discovery** — list guilds, members, channels, and bans so the agent can select its target.
+- **Messaging** — read, send, edit, and delete messages.
+- **Channels** — inspect, configure (name, description, NSFW, slowmode), create, and delete channels.
+- **Guild config** — set the guild name, description, and rules channel.
+- **Moderation** — kick and ban behind an explicit consent gate; list and unban.
 - **Raw REST** — a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
-Planned: embeds, channel configuration and management, consent-gated moderation, invites, and emoji
-management.
+Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`) require an
+explicit `"confirm": true` consent flag.
 
 ## Tools
 
-Available in `0.1.0`:
-
-| Tool | Purpose |
+| Module | Tools |
 | --- | --- |
-| `ping` | Health check that responds with `pong`. |
-| `list_guilds` / `get_guild` | Discover and inspect the guilds the bot belongs to. |
-| `list_members` / `get_member` | Discover and inspect users within a guild. |
-| `read_messages` / `send_message` | Read and send channel messages. |
-| `discord_request` | Generic Discord REST API call for edge cases. |
+| Health | `ping` |
+| Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
+| Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message` |
+| Channels | `modify_channel`, `create_channel`, `delete_channel` |
+| Guild config | `modify_guild` |
+| Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |
+| Raw | `discord_request` |
 
-> Actions are per-guild: discover a guild, list its members, then act. See
-> [docs/tools.md](./docs/tools.md) for the selection pipeline and tool details.
+See [docs/tools.md](./docs/tools.md) for the full reference, the selection pipeline, and the
+consent model.
 
 ## Quick Start
 

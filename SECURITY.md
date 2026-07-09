@@ -16,5 +16,12 @@ maintainer directly.
   error messages are scrubbed with `[REDACTED]` before being returned or printed.
 - The `discord_request` tool can reach any endpoint the bot can; the token stays server-side and is
   never exposed to the caller.
-- Moderation tools gate destructive actions (kick/ban) behind an explicit consent flag.
-- Grant the bot only the permissions its tasks actually require.
+
+## Destructive actions
+
+`kick_member`, `ban_member`, `delete_channel`, and `delete_message` are destructive and require an
+explicit `"confirm": true` consent flag. Without consent they return an error and perform no action.
+
+## Least privilege
+
+Grant the bot only the permissions its tasks actually require.
