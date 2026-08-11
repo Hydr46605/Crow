@@ -1,3 +1,7 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { config as loadDotenv } from 'dotenv';
 import { SNOWFLAKE_PATTERN } from './discord/snowflake.js';
 
 export interface CrowConfig {
@@ -10,11 +14,25 @@ export interface CrowConfig {
 export const BOT_USER_ID_VAR = 'CROW_BOT_USER_ID';
 export const BOT_TOKEN_VAR = 'CROW_BOT_TOKEN';
 
+/** Install/configuration directory. Override with the `CROW_HOME` environment variable. */
+export const CROW_HOME = process.env.CROW_HOME ?? join(homedir(), '.crow');
+
 export class ConfigError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ConfigError';
   }
+}
+
+/**
+ * Loads configuration from `.env` files without overriding already-set
+ * environment variables (so MCP clients that pass credentials inline win).
+ *
+ * Order: project-local `.env` first, then `$CROW_HOME/.env`.
+ */
+export function loadEnvFiles(): void {
+  loadDotenv({ path: join(process.cwd(), '.env') });
+  loadDotenv({ path: join(CROW_HOME, '.env') });
 }
 
 /**
@@ -36,7 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CrowConfig {
 
     throw new ConfigError(
       `Missing required environment variable(s): ${missing.join(', ')}. ` +
-        'Copy .env.example to .env and set your Discord bot credentials.',
+        'Run `crow setup` to configure your bot, or set them in your environment.',
     );
   }
 
@@ -50,3 +68,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CrowConfig {
 
   return { botUserId, botToken };
 }
+
+/** Path of the user-level `.env` file that `loadEnvFiles` reads. */
+export const configFilePath = (): string => join(CROW_HOME, '.env');
+
+/**
+ * Persists credentials to the user-level `.env` file (owner-readable).
+ *
+ * Returns the path written. The token is stored verbatim so the server can read
+ * it back on startup; the file is created with `0600` permissions where the
+ * platform supports them.
+ */
+export const saveConfig = (config: CrowConfig, path: string = configFilePath()): string => {
+  mkdirSync(dirname(path), { recursive: true });
+  const content = `${BOT_USER_ID_VAR}=${config.botUserId}\n${BOT_TOKEN_VAR}=${config.botToken}\n`;
+  writeFileSync(path, content, { encoding: 'utf8', mode: 0o600 });
+  return path;
+};

@@ -1,34 +1,44 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
+import { parseArgs } from './cli/args.js';
+import { runDoctorCli } from './cli/doctor.js';
+import { printHelp } from './cli/help.js';
+import { runWizard } from './cli/wizard.js';
+import { loadEnvFiles } from './config.js';
+import { handleFatal, serve } from './serve.js';
+import { VERSION } from './version.js';
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { BOT_TOKEN_VAR, loadConfig } from './config.js';
-import { DiscordClient } from './discord/client.js';
-import { redactSecrets } from './security/redact.js';
-import { createServer } from './server.js';
+/**
+ * `crow` command dispatcher.
+ *
+ * With no arguments it behaves as an MCP server over stdio; the subcommands
+ * (`setup`, `doctor`, `--version`, `--help`) drive the developer-facing CLI.
+ */
+const main = async (): Promise<void> => {
+  loadEnvFiles();
 
-const run = async (): Promise<void> => {
-  const config = loadConfig();
-  const discord = new DiscordClient(config.botToken);
-  const server = createServer({ config, discord });
-
-  const shutdown = async (): Promise<void> => {
-    await server.close();
-    process.exit(0);
-  };
-
-  process.once('SIGINT', () => void shutdown());
-  process.once('SIGTERM', () => void shutdown());
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const command = parseArgs(process.argv.slice(2));
+  switch (command.kind) {
+    case 'serve':
+      await serve();
+      return;
+    case 'setup':
+      await runWizard();
+      return;
+    case 'doctor':
+      await runDoctorCli();
+      return;
+    case 'version':
+      process.stdout.write(`${VERSION}\n`);
+      return;
+    case 'help':
+      printHelp();
+      return;
+    case 'unknown':
+      process.stderr.write(`Unknown command: ${command.arg}\n\n`);
+      printHelp();
+      process.exit(2);
+  }
 };
 
-run().catch((error: unknown) => {
-  // stderr is safe here; stdout is reserved for the MCP protocol. Never log the token.
-  const token = process.env[BOT_TOKEN_VAR] ?? '';
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[crow] ${redactSecrets(message, [token])}`);
-  process.exit(1);
-});
+void main().catch(handleFatal);

@@ -24,11 +24,25 @@ export const toErrorMessage = (error: unknown): string =>
 
 /** Error thrown for failed or invalid Discord requests, with secrets redacted. */
 export class DiscordRequestError extends Error {
-  constructor(message: string) {
+  /** HTTP status code, when the failure came from a Discord REST response. */
+  readonly statusCode?: number;
+
+  constructor(message: string, statusCode?: number) {
     super(message);
     this.name = 'DiscordRequestError';
+    this.statusCode = statusCode;
   }
 }
+
+/** Best-effort extraction of an HTTP status from a Discord REST error. */
+const extractStatus = (error: unknown): number | undefined => {
+  if (typeof error === 'object' && error !== null) {
+    const e = error as { status?: unknown; statusCode?: unknown };
+    if (typeof e.status === 'number') return e.status;
+    if (typeof e.statusCode === 'number') return e.statusCode;
+  }
+  return undefined;
+};
 
 interface RestRequestData {
   body?: unknown;
@@ -102,7 +116,10 @@ export class DiscordClient {
     try {
       return (await this.execute(method, fullRoute, options)) as T;
     } catch (error) {
-      throw new DiscordRequestError(redactSecrets(toErrorMessage(error), [this.token]));
+      throw new DiscordRequestError(
+        redactSecrets(toErrorMessage(error), [this.token]),
+        extractStatus(error),
+      );
     }
   }
 }
