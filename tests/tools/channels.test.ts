@@ -31,7 +31,7 @@ describe('summarizeChannel', () => {
       nsfw: false,
       position: 1,
       parentId: '9',
-      rateLimitPerUser: 5,
+      slowmodeSeconds: 5,
     });
   });
 });
@@ -73,11 +73,14 @@ describe('modifyChannel', () => {
       return rawChannel;
     });
 
-    await modifyChannel({ channelId: '1', name: 'renamed', nsfw: true }, createContext(discord));
+    await modifyChannel(
+      { channelId: '1', name: 'renamed', nsfw: true, slowmodeSeconds: 30 },
+      createContext(discord),
+    );
 
     expect(captured?.m).toBe('PATCH');
     expect(captured?.r).toBe('/channels/1');
-    expect(captured?.o.body).toEqual({ name: 'renamed', nsfw: true });
+    expect(captured?.o.body).toEqual({ name: 'renamed', nsfw: true, rate_limit_per_user: 30 });
   });
 });
 

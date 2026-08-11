@@ -38,6 +38,6 @@ describe('rawRequest', () => {
     const result = await rawRequest({ method: 'GET', route: '/users/@me' }, createContext(discord));
 
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('boom');
+    expect(textOf(result)).toBe('discord_request failed: boom');
   });
 });
