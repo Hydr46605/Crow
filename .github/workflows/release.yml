@@ -7,14 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g. 0.2.0)'
+        description: 'Version (e.g. 0.4.0)'
         required: true
         type: string
-      dry-run:
-        description: 'Dry run (no publish)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -30,7 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
           cache: npm
 
       - name: Configure git
@@ -136,9 +130,3 @@ jobs:
           body_path: CHANGELOG_BODY.md
           draft: false
           prerelease: ${{ startsWith(steps.version.outputs.version, '0.') }}
-
-      - name: Publish to npm
-        if: inputs.dry-run != true
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

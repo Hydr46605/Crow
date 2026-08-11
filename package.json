@@ -1,9 +1,10 @@
 {
   "name": "crow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "An MCP server exposing extensive Discord capabilities to AI agents.",
   "author": "Hydr46605 <https://github.com/Hydr46605>",
   "license": "MIT",
+  "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -27,10 +28,6 @@
   "bin": {
     "crow": "dist/index.js"
   },
-  "files": [
-    "dist",
-    "CHANGELOG.md"
-  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
