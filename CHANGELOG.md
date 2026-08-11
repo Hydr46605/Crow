@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2026-08-16
+### Added
+- MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on every tool so agents can reason about safety.
+- Human-readable tool titles and per-field input descriptions surfaced through each tool's schema.
+### Changed
+- Renamed `rateLimitPerUser` to `slowmodeSeconds` in `modify_channel` for clarity.
+- Error results now include the failing action (e.g. `read_messages failed: ...`).
+### Security
+- Read-only and destructive behavior is now machine-readable via annotations.
+
 ## [0.2.0] - 2026-08-16
 ### Added
 - Moderation tools: `list_bans`, `get_ban`, `kick_member`, `ban_member`, and `unban_member`.

@@ -30,6 +30,17 @@ Destructive tools require an explicit `"confirm": true` argument. Without it the
 and take no action. This applies to `kick_member`, `ban_member`, `delete_channel`, and
 `delete_message`.
 
+## Annotations
+
+Every tool carries MCP annotations so clients can reason about safety without reading source:
+
+- Read-only tools (`list_*`, `get_*`, `read_messages`, `ping`) set `readOnlyHint`.
+- Destructive tools (`kick_member`, `ban_member`, `delete_channel`, `delete_message`) set `destructiveHint`.
+- Idempotent writes (`edit_message`, `modify_channel`, `modify_guild`, `unban_member`) set `idempotentHint`.
+- `discord_request` sets `openWorldHint` because it can reach any endpoint.
+
+Each tool also has a human-readable `title` and per-field descriptions in its input schema.
+
 ## Tool reference
 
 ### Health
@@ -58,7 +69,7 @@ and take no action. This applies to `kick_member`, `ban_member`, `delete_channel
 ### Channels & guilds
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
-| `modify_channel` | `channelId`, `name?`, `topic?`, `nsfw?`, `rateLimitPerUser?`, `position?` | Modify channel name, description, NSFW, slowmode, position. |
+| `modify_channel` | `channelId`, `name?`, `topic?`, `nsfw?`, `slowmodeSeconds?`, `position?` | Modify channel name, description, NSFW, slowmode, position. |
 | `create_channel` | `guildId`, `name`, `type?`, `topic?`, `nsfw?`, `parentId?`, `position?` | Create a channel. |
 | `delete_channel` | `channelId`, `confirm` | Delete a channel (consent-gated). |
 | `modify_guild` | `guildId`, `name?`, `description?`, `rulesChannelId?` | Modify guild name, description, rules channel. |

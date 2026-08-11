@@ -37,6 +37,10 @@ and registering it.
 Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`) require an
 explicit `"confirm": true` consent flag.
 
+Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+`openWorldHint`) plus human-readable titles and per-field descriptions, so clients can present and
+permission the tools safely.
+
 ## Tools
 
 | Module | Tools |
