@@ -58,28 +58,65 @@ consent model.
 
 ## Quick Start
 
+Install with one command — it clones the repo, builds it, links the `crow` command onto your PATH,
+and drops you into the setup wizard:
+
 ```bash
-npm install
-cp .env.example .env   # then fill in CROW_BOT_TOKEN and CROW_BOT_USER_ID
-npm run build
-npm start
+curl -fsSL https://raw.githubusercontent.com/Hydr46605/Crow/main/install.sh | sh
 ```
 
-Crow speaks MCP over stdio. Point your MCP client at it:
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/Hydr46605/Crow/main/install.ps1 | iex
+```
+
+Windows (cmd.exe):
+
+```bat
+curl -o install.bat https://raw.githubusercontent.com/Hydr46605/Crow/main/install.bat && install.bat
+```
+
+The wizard asks for your bot token, detects the bot user ID, verifies the token against Discord,
+and checks that the privileged intents Crow needs (`GUILD_MEMBERS`, `MESSAGE_CONTENT`) are enabled —
+prompting you to fix and re-check them if they are not.
+
+## Command line
+
+Crow ships a single `crow` command:
+
+| Command | What it does |
+| --- | --- |
+| `crow` / `crow serve` | Run the MCP server over stdio. |
+| `crow setup` | Interactive setup wizard (token → user ID → intent check → save). |
+| `crow doctor` | Check the bot token and privileged intents. |
+| `crow --version` | Print the version. |
+| `crow --help` | Show help. |
+
+Credentials live in `~/.crow/.env` (owner-readable) and are loaded automatically, so an MCP client
+config is just:
 
 ```json
 {
   "mcpServers": {
     "crow": {
-      "command": "node",
-      "args": ["dist/index.js"],
-      "env": {
-        "CROW_BOT_TOKEN": "<your-bot-token>",
-        "CROW_BOT_USER_ID": "<your-bot-user-id>"
-      }
+      "command": "crow"
     }
   }
 }
+```
+
+Prefer inline credentials? You can still set `CROW_BOT_TOKEN` and `CROW_BOT_USER_ID` in the
+client's `env` block instead.
+
+### Build from source
+
+```bash
+git clone https://github.com/Hydr46605/Crow.git
+cd Crow
+npm install
+npm run build
+npm start
 ```
 
 ## Compatibility
@@ -87,6 +124,7 @@ Crow speaks MCP over stdio. Point your MCP client at it:
 - Node.js `>= 22` (CI runs against 22 and 24).
 - ESM-only.
 - Discord API v10 via `discord.js`.
+- Distributed via GitHub (not npm) — install with the scripts above.
 - Pre-1.0: the tool surface may still change during the `0.x` line.
 
 ## License

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0] - 2026-08-16
+### Added
+- `crow` CLI command (`serve`, `setup`, `doctor`, `--version`, `--help`).
+- Interactive setup wizard with live token verification, bot user ID auto-detection, and a privileged-intent check with a fix-and-recheck flow.
+- `crow doctor` to validate the bot token and report `GUILD_MEMBERS` / `MESSAGE_CONTENT` intent status.
+- One-command installers: `install.sh`, `install.ps1`, and `install.bat` for GitHub distribution.
+- `CROW_HOME` configuration directory and `saveConfig` for owner-readable credential storage.
+### Changed
+- Distribution is now GitHub-only: the package is marked `private` and the release workflow no longer publishes to npm.
+- The entrypoint now dispatches CLI commands in addition to serving MCP over stdio.
+### Security
+- Discord request errors now carry their HTTP status code, enabling accurate 401 detection without exposing the token.
+- The bot token is captured with hidden input and stored in `~/.crow/.env` with `0600` permissions.
+
 ## [0.3.0] - 2026-08-16
 ### Added
 - MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on every tool so agents can reason about safety.
