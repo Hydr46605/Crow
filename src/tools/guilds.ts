@@ -2,17 +2,26 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
+import { IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
 import { snowflake } from './schemas.js';
 
-const getGuildInput = { guildId: snowflake };
+const getGuildInput = {
+  guildId: snowflake.describe('The ID of the guild to fetch.'),
+};
 
 const modifyGuildInput = {
-  guildId: snowflake,
-  name: z.string().min(2).max(100).optional(),
-  description: z.string().max(300).optional(),
-  rulesChannelId: snowflake.optional(),
+  guildId: snowflake.describe('The ID of the guild to modify.'),
+  name: z.string().min(2).max(100).optional().describe('New guild name (2-100 characters).'),
+  description: z
+    .string()
+    .max(300)
+    .optional()
+    .describe('New guild description (up to 300 characters).'),
+  rulesChannelId: snowflake
+    .optional()
+    .describe('The channel to use as the community rules channel.'),
 };
 
 export interface GetGuildArgs {
@@ -58,7 +67,7 @@ export const summarizeGuild = (guild: RawGuild): GuildSummary => ({
 });
 
 export const listGuilds = async (ctx: CrowContext): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('list_guilds', () =>
     ctx.discord.request<RawGuild[]>('GET', '/users/@me/guilds', {
       query: { with_counts: true },
     }),
@@ -68,7 +77,7 @@ export const listGuilds = async (ctx: CrowContext): Promise<CallToolResult> => {
 };
 
 export const getGuild = async (args: GetGuildArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('get_guild', () =>
     ctx.discord.request<RawGuild>('GET', `/guilds/${args.guildId}`, {
       query: { with_counts: true },
     }),
@@ -86,7 +95,7 @@ export const modifyGuild = async (
   if (args.description !== undefined) body.description = args.description;
   if (args.rulesChannelId !== undefined) body.rules_channel_id = args.rulesChannelId;
 
-  const result = await attempt(() =>
+  const result = await attempt('modify_guild', () =>
     ctx.discord.request<RawGuild>('PATCH', `/guilds/${args.guildId}`, { body }),
   );
   if (!result.ok) return errorResult(result.error);
@@ -97,26 +106,33 @@ export const registerGuildTools = (server: McpServer, ctx: CrowContext): void =>
   server.registerTool(
     'list_guilds',
     {
+      title: 'List guilds',
       description:
-        'List the guilds (servers) the bot is a member of. Use this first to discover available guilds.',
+        'List the guilds (servers) the bot is a member of, with approximate member counts. ' +
+        'Use this first to discover the guilds available for selection.',
+      annotations: READ_ONLY,
     },
     async () => listGuilds(ctx),
   );
   server.registerTool(
     'get_guild',
     {
-      description: 'Get details for a single guild by ID.',
+      title: 'Get guild',
+      description: 'Get details (name, owner, description, member counts) for a single guild by ID.',
       inputSchema: getGuildInput,
+      annotations: READ_ONLY,
     },
     async (args) => getGuild(args, ctx),
   );
   server.registerTool(
     'modify_guild',
     {
+      title: 'Modify guild',
       description:
         'Modify guild settings: name, description, and the community rules channel. ' +
         'Setting a rules channel requires the COMMUNITY feature to be enabled.',
       inputSchema: modifyGuildInput,
+      annotations: IDEMPOTENT,
     },
     async (args) => modifyGuild(args, ctx),
   );

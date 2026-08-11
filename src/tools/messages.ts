@@ -2,34 +2,49 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
+import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { requireConsent } from './consent.js';
 import { errorResult, textResult } from './result.js';
 import { consent, snowflake } from './schemas.js';
 
 const readMessagesInput = {
-  channelId: snowflake,
-  limit: z.number().int().min(1).max(100).optional(),
-  before: snowflake.optional(),
-  after: snowflake.optional(),
-  around: snowflake.optional(),
+  channelId: snowflake.describe('The ID of the channel to read messages from.'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Maximum number of messages to return (1-100).'),
+  before: snowflake.optional().describe('Return messages before this message ID.'),
+  after: snowflake.optional().describe('Return messages after this message ID.'),
+  around: snowflake.optional().describe('Return messages around this message ID.'),
 };
 
 const sendMessageInput = {
-  channelId: snowflake,
-  content: z.string().min(1).max(2000),
-  replyTo: snowflake.optional(),
+  channelId: snowflake.describe('The ID of the channel to send the message to.'),
+  content: z
+    .string()
+    .min(1)
+    .max(2000)
+    .describe('The message content (1-2000 characters).'),
+  replyTo: snowflake.optional().describe('The ID of the message to reply to.'),
 };
 
 const editMessageInput = {
-  channelId: snowflake,
-  messageId: snowflake,
-  content: z.string().min(1).max(2000),
+  channelId: snowflake.describe('The ID of the channel containing the message.'),
+  messageId: snowflake.describe('The ID of the message to edit.'),
+  content: z
+    .string()
+    .min(1)
+    .max(2000)
+    .describe('The new message content (1-2000 characters).'),
 };
 
 const deleteMessageInput = {
-  channelId: snowflake,
-  messageId: snowflake,
+  channelId: snowflake.describe('The ID of the channel containing the message.'),
+  messageId: snowflake.describe('The ID of the message to delete.'),
   confirm: consent,
 };
 
@@ -101,7 +116,7 @@ export const readMessages = async (
     around: args.around,
   };
 
-  const result = await attempt(() =>
+  const result = await attempt('read_messages', () =>
     ctx.discord.request<RawMessage[]>('GET', `/channels/${args.channelId}/messages`, { query }),
   );
   if (!result.ok) return errorResult(result.error);
@@ -117,7 +132,7 @@ export const sendMessage = async (
     body.message_reference = { message_id: args.replyTo };
   }
 
-  const result = await attempt(() =>
+  const result = await attempt('send_message', () =>
     ctx.discord.request<RawMessage>('POST', `/channels/${args.channelId}/messages`, { body }),
   );
   if (!result.ok) return errorResult(result.error);
@@ -128,7 +143,7 @@ export const editMessage = async (
   args: EditMessageArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('edit_message', () =>
     ctx.discord.request<RawMessage>(
       'PATCH',
       `/channels/${args.channelId}/messages/${args.messageId}`,
@@ -146,7 +161,7 @@ export const deleteMessage = async (
   const gate = requireConsent(args.confirm);
   if (gate) return gate;
 
-  const result = await attempt(() =>
+  const result = await attempt('delete_message', () =>
     ctx.discord.request<unknown>(
       'DELETE',
       `/channels/${args.channelId}/messages/${args.messageId}`,
@@ -160,15 +175,19 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
   server.registerTool(
     'read_messages',
     {
-      description: 'Read recent messages from a Discord channel.',
+      title: 'Read messages',
+      description:
+        'Read recent messages from a Discord channel, with optional pagination via before/after/around.',
       inputSchema: readMessagesInput,
+      annotations: READ_ONLY,
     },
     async (args) => readMessages(args, ctx),
   );
   server.registerTool(
     'send_message',
     {
-      description: 'Send a message to a Discord channel.',
+      title: 'Send message',
+      description: 'Send a message to a Discord channel, optionally replying to an existing message.',
       inputSchema: sendMessageInput,
     },
     async (args) => sendMessage(args, ctx),
@@ -176,16 +195,20 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
   server.registerTool(
     'edit_message',
     {
+      title: 'Edit message',
       description: 'Edit the content of an existing message.',
       inputSchema: editMessageInput,
+      annotations: IDEMPOTENT,
     },
     async (args) => editMessage(args, ctx),
   );
   server.registerTool(
     'delete_message',
     {
+      title: 'Delete message',
       description: 'Delete a message. Requires explicit consent ("confirm": true).',
       inputSchema: deleteMessageInput,
+      annotations: DESTRUCTIVE,
     },
     async (args) => deleteMessage(args, ctx),
   );

@@ -2,40 +2,53 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
+import { DESTRUCTIVE, DESTRUCTIVE_IDEMPOTENT, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { requireConsent } from './consent.js';
 import { errorResult, textResult } from './result.js';
 import { consent, snowflake } from './schemas.js';
 
 const listBansInput = {
-  guildId: snowflake,
-  limit: z.number().int().min(1).max(1000).optional(),
+  guildId: snowflake.describe('The ID of the guild whose bans to list.'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe('Maximum number of bans to return (1-1000).'),
 };
 
 const getBanInput = {
-  guildId: snowflake,
-  userId: snowflake,
+  guildId: snowflake.describe('The ID of the guild.'),
+  userId: snowflake.describe('The ID of the banned user.'),
 };
 
 const kickMemberInput = {
-  guildId: snowflake,
-  userId: snowflake,
+  guildId: snowflake.describe('The ID of the guild to kick the member from.'),
+  userId: snowflake.describe('The ID of the member to kick.'),
   confirm: consent,
-  reason: z.string().max(512).optional(),
+  reason: z.string().max(512).optional().describe('Audit-log reason for the kick.'),
 };
 
 const banMemberInput = {
-  guildId: snowflake,
-  userId: snowflake,
+  guildId: snowflake.describe('The ID of the guild to ban the member from.'),
+  userId: snowflake.describe('The ID of the member to ban.'),
   confirm: consent,
-  deleteMessageDays: z.number().int().min(0).max(7).optional(),
-  reason: z.string().max(512).optional(),
+  deleteMessageDays: z
+    .number()
+    .int()
+    .min(0)
+    .max(7)
+    .optional()
+    .describe('Delete messages sent by the user in the last 0-7 days.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason for the ban.'),
 };
 
 const unbanMemberInput = {
-  guildId: snowflake,
-  userId: snowflake,
-  reason: z.string().max(512).optional(),
+  guildId: snowflake.describe('The ID of the guild.'),
+  userId: snowflake.describe('The ID of the user to unban.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason for the unban.'),
 };
 
 export interface ListBansArgs {
@@ -91,7 +104,7 @@ export const summarizeBan = (ban: RawBan): BanSummary => ({
 export const deleteMessageSeconds = (days: number | undefined): number => (days ?? 0) * 86_400;
 
 export const listBans = async (args: ListBansArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('list_bans', () =>
     ctx.discord.request<RawBan[]>('GET', `/guilds/${args.guildId}/bans`, {
       query: { limit: args.limit },
     }),
@@ -101,7 +114,7 @@ export const listBans = async (args: ListBansArgs, ctx: CrowContext): Promise<Ca
 };
 
 export const getBan = async (args: GetBanArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('get_ban', () =>
     ctx.discord.request<RawBan>('GET', `/guilds/${args.guildId}/bans/${args.userId}`),
   );
   if (!result.ok) return errorResult(result.error);
@@ -112,7 +125,7 @@ export const kickMember = async (args: KickMemberArgs, ctx: CrowContext): Promis
   const gate = requireConsent(args.confirm);
   if (gate) return gate;
 
-  const result = await attempt(() =>
+  const result = await attempt('kick_member', () =>
     ctx.discord.request<unknown>('DELETE', `/guilds/${args.guildId}/members/${args.userId}`, {
       reason: args.reason,
     }),
@@ -125,7 +138,7 @@ export const banMember = async (args: BanMemberArgs, ctx: CrowContext): Promise<
   const gate = requireConsent(args.confirm);
   if (gate) return gate;
 
-  const result = await attempt(() =>
+  const result = await attempt('ban_member', () =>
     ctx.discord.request<unknown>('PUT', `/guilds/${args.guildId}/bans/${args.userId}`, {
       body: { delete_message_seconds: deleteMessageSeconds(args.deleteMessageDays) },
       reason: args.reason,
@@ -139,7 +152,7 @@ export const unbanMember = async (
   args: UnbanMemberArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('unban_member', () =>
     ctx.discord.request<unknown>('DELETE', `/guilds/${args.guildId}/bans/${args.userId}`, {
       reason: args.reason,
     }),
@@ -151,33 +164,54 @@ export const unbanMember = async (
 export const registerModerationTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'list_bans',
-    { description: 'List bans for a guild.', inputSchema: listBansInput },
+    {
+      title: 'List bans',
+      description: 'List the bans in a guild.',
+      inputSchema: listBansInput,
+      annotations: READ_ONLY,
+    },
     async (args) => listBans(args, ctx),
   );
   server.registerTool(
     'get_ban',
-    { description: 'Get a single ban by user ID.', inputSchema: getBanInput },
+    {
+      title: 'Get ban',
+      description: 'Get a single ban by user ID.',
+      inputSchema: getBanInput,
+      annotations: READ_ONLY,
+    },
     async (args) => getBan(args, ctx),
   );
   server.registerTool(
     'kick_member',
     {
+      title: 'Kick member',
       description: 'Kick a member from a guild. Requires explicit consent ("confirm": true).',
       inputSchema: kickMemberInput,
+      annotations: DESTRUCTIVE,
     },
     async (args) => kickMember(args, ctx),
   );
   server.registerTool(
     'ban_member',
     {
-      description: 'Ban a member from a guild. Requires explicit consent ("confirm": true).',
+      title: 'Ban member',
+      description:
+        'Ban a member from a guild, optionally deleting their recent messages. ' +
+        'Requires explicit consent ("confirm": true).',
       inputSchema: banMemberInput,
+      annotations: DESTRUCTIVE_IDEMPOTENT,
     },
     async (args) => banMember(args, ctx),
   );
   server.registerTool(
     'unban_member',
-    { description: 'Remove a ban from a guild.', inputSchema: unbanMemberInput },
+    {
+      title: 'Unban member',
+      description: 'Remove a ban from a guild.',
+      inputSchema: unbanMemberInput,
+      annotations: IDEMPOTENT,
+    },
     async (args) => unbanMember(args, ctx),
   );
 };

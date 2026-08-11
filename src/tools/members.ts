@@ -2,20 +2,31 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
+import { READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
 import { snowflake } from './schemas.js';
 
 const listMembersInput = {
-  guildId: snowflake,
-  query: z.string().max(100).optional(),
-  limit: z.number().int().min(1).max(1000).optional(),
-  after: snowflake.optional(),
+  guildId: snowflake.describe('The ID of the guild whose members to list.'),
+  query: z
+    .string()
+    .max(100)
+    .optional()
+    .describe('Filter members whose username or nickname starts with this text.'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe('Maximum number of members to return (1-1000).'),
+  after: snowflake.optional().describe('Return members after this user ID (for pagination).'),
 };
 
 const getMemberInput = {
-  guildId: snowflake,
-  userId: snowflake,
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the user to fetch.'),
 };
 
 export interface ListMembersArgs {
@@ -69,7 +80,7 @@ export const listMembers = async (
   args: ListMembersArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('list_members', () =>
     ctx.discord.request<RawMember[]>('GET', `/guilds/${args.guildId}/members`, {
       query: { limit: args.limit, after: args.after, query: args.query },
     }),
@@ -79,7 +90,7 @@ export const listMembers = async (
 };
 
 export const getMember = async (args: GetMemberArgs, ctx: CrowContext): Promise<CallToolResult> => {
-  const result = await attempt(() =>
+  const result = await attempt('get_member', () =>
     ctx.discord.request<RawMember>('GET', `/guilds/${args.guildId}/members/${args.userId}`),
   );
   if (!result.ok) return errorResult(result.error);
@@ -90,18 +101,22 @@ export const registerMemberTools = (server: McpServer, ctx: CrowContext): void =
   server.registerTool(
     'list_members',
     {
+      title: 'List members',
       description:
         'List members of a guild, optionally filtered by a username search. ' +
         'May require the GUILD_MEMBERS privileged intent for the bot.',
       inputSchema: listMembersInput,
+      annotations: READ_ONLY,
     },
     async (args) => listMembers(args, ctx),
   );
   server.registerTool(
     'get_member',
     {
-      description: 'Get a single guild member by user ID.',
+      title: 'Get member',
+      description: 'Get a single guild member (user, nickname, roles, join date) by user ID.',
       inputSchema: getMemberInput,
+      annotations: READ_ONLY,
     },
     async (args) => getMember(args, ctx),
   );
