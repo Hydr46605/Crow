@@ -1,5 +1,8 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from '../src/config.js';
+import { ConfigError, configFilePath, loadConfig, saveConfig } from '../src/config.js';
 
 const validEnv = {
   CROW_BOT_USER_ID: '123456789012345678',
@@ -46,5 +49,39 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ CROW_BOT_USER_ID: '123456789012345678', CROW_BOT_TOKEN: 'bad token' }),
     ).toThrow(ConfigError);
+  });
+});
+
+describe('saveConfig', () => {
+  it('writes credentials to the given path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'crow-config-'));
+    try {
+      const path = join(dir, '.env');
+      const written = saveConfig({ botUserId: '123456789012345678', botToken: 'tok' }, path);
+
+      expect(written).toBe(path);
+      expect(readFileSync(path, 'utf8')).toBe(
+        'CROW_BOT_USER_ID=123456789012345678\nCROW_BOT_TOKEN=tok\n',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('creates parent directories as needed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'crow-config-'));
+    try {
+      const path = join(dir, 'nested', '.env');
+      saveConfig({ botUserId: '123456789012345678', botToken: 'tok' }, path);
+      expect(readFileSync(path, 'utf8')).toContain('CROW_BOT_TOKEN=tok');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('configFilePath', () => {
+  it('points into the .crow home directory', () => {
+    expect(configFilePath().endsWith(join('.crow', '.env'))).toBe(true);
   });
 });
