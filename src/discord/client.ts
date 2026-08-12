@@ -19,6 +19,23 @@ export type RequestExecutor = (
   options: DiscordRequestOptions,
 ) => Promise<unknown>;
 
+/** Options for executing a webhook (message send via the webhook's own token). */
+export interface WebhookExecuteOptions {
+  readonly body?: unknown;
+  readonly query?: Record<string, string | number | boolean | undefined>;
+}
+
+/**
+ * Low-level webhook executor. Webhook execution authenticates with the webhook
+ * token in the URL (not the bot token), so it uses `fetch` against the
+ * webhook endpoint directly instead of the discord.js `REST` client.
+ */
+export type WebhookExecutor = (
+  webhookId: string,
+  webhookToken: string,
+  options: WebhookExecuteOptions,
+) => Promise<unknown>;
+
 export const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -64,6 +81,34 @@ const toRequestData = (options: DiscordRequestOptions): RestRequestData => {
   return data;
 };
 
+const WEBHOOK_BASE = 'https://discord.com/api/webhooks';
+
+const createWebhookExecutor = (): WebhookExecutor => {
+  return async (webhookId, webhookToken, options) => {
+    const url = new URL(`${WEBHOOK_BASE}/${webhookId}/${webhookToken}`);
+    if (options.query) {
+      for (const [key, value] of Object.entries(options.query)) {
+        if (value !== undefined) url.searchParams.set(key, String(value));
+      }
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+
+    if (response.status === 204) return null;
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = data ? JSON.stringify(data) : response.statusText;
+      throw new DiscordRequestError(detail, response.status);
+    }
+    return data;
+  };
+};
+
 const createRestExecutor = (token: string): RequestExecutor => {
   const rest = new REST({ version: '10' }).setToken(token);
   return (method, fullRoute, options) => {
@@ -98,10 +143,12 @@ const createRestExecutor = (token: string): RequestExecutor => {
 export class DiscordClient {
   private readonly token: string;
   private readonly execute: RequestExecutor;
+  private readonly executeWebhookFn: WebhookExecutor;
 
-  constructor(token: string, execute?: RequestExecutor) {
+  constructor(token: string, execute?: RequestExecutor, executeWebhook?: WebhookExecutor) {
     this.token = token;
     this.execute = execute ?? createRestExecutor(token);
+    this.executeWebhookFn = executeWebhook ?? createWebhookExecutor();
   }
 
   /** Performs a raw request against the Discord API and returns the parsed body. */
@@ -118,6 +165,26 @@ export class DiscordClient {
     } catch (error) {
       throw new DiscordRequestError(
         redactSecrets(toErrorMessage(error), [this.token]),
+        extractStatus(error),
+      );
+    }
+  }
+
+  /**
+   * Executes a webhook, sending a message through the webhook's own token.
+   *
+   * The webhook token is a secret, so it is redacted from any error surfaced.
+   */
+  async executeWebhook<T>(
+    webhookId: string,
+    webhookToken: string,
+    options: WebhookExecuteOptions = {},
+  ): Promise<T> {
+    try {
+      return (await this.executeWebhookFn(webhookId, webhookToken, options)) as T;
+    } catch (error) {
+      throw new DiscordRequestError(
+        redactSecrets(toErrorMessage(error), [webhookToken]),
         extractStatus(error),
       );
     }

@@ -4,9 +4,11 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
 import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
+import { componentsSchema, normalizeComponents } from './components.js';
 import { requireConsent } from './consent.js';
+import { embedsSchema, normalizeEmbeds } from './embeds.js';
 import { errorResult, textResult } from './result.js';
-import { consent, snowflake } from './schemas.js';
+import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake } from './schemas.js';
 
 const readMessagesInput = {
   channelId: snowflake.describe('The ID of the channel to read messages from.'),
@@ -22,25 +24,51 @@ const readMessagesInput = {
   around: snowflake.optional().describe('Return messages around this message ID.'),
 };
 
-const sendMessageInput = {
-  channelId: snowflake.describe('The ID of the channel to send the message to.'),
-  content: z
-    .string()
-    .min(1)
-    .max(2000)
-    .describe('The message content (1-2000 characters).'),
-  replyTo: snowflake.optional().describe('The ID of the message to reply to.'),
-};
+const sendMessageInput = z
+  .object({
+    channelId: snowflake.describe('The ID of the channel to send the message to.'),
+    content: z
+      .string()
+      .min(1)
+      .max(2000)
+      .optional()
+      .describe('The message content (1-2000 characters).'),
+    embeds: embedsSchema.optional(),
+    components: componentsSchema.optional(),
+    allowedMentions: allowedMentionsSchema,
+    tts: z.boolean().optional().describe('Whether this is a text-to-speech message.'),
+    replyTo: snowflake.optional().describe('The ID of the message to reply to.'),
+  })
+  .superRefine((args, ctx) => {
+    if (!args.content && !args.embeds) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide "content", "embeds", or both.',
+      });
+    }
+  });
 
-const editMessageInput = {
-  channelId: snowflake.describe('The ID of the channel containing the message.'),
-  messageId: snowflake.describe('The ID of the message to edit.'),
-  content: z
-    .string()
-    .min(1)
-    .max(2000)
-    .describe('The new message content (1-2000 characters).'),
-};
+const editMessageInput = z
+  .object({
+    channelId: snowflake.describe('The ID of the channel containing the message.'),
+    messageId: snowflake.describe('The ID of the message to edit.'),
+    content: z
+      .string()
+      .min(1)
+      .max(2000)
+      .optional()
+      .describe('The new message content (1-2000 characters).'),
+    embeds: embedsSchema.optional(),
+    components: componentsSchema.optional(),
+  })
+  .superRefine((args, ctx) => {
+    if (!args.content && !args.embeds && !args.components) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide at least one of "content", "embeds", or "components".',
+      });
+    }
+  });
 
 const deleteMessageInput = {
   channelId: snowflake.describe('The ID of the channel containing the message.'),
@@ -56,17 +84,8 @@ export interface ReadMessagesArgs {
   readonly around?: string;
 }
 
-export interface SendMessageArgs {
-  readonly channelId: string;
-  readonly content: string;
-  readonly replyTo?: string;
-}
-
-export interface EditMessageArgs {
-  readonly channelId: string;
-  readonly messageId: string;
-  readonly content: string;
-}
+export type SendMessageArgs = z.infer<typeof sendMessageInput>;
+export type EditMessageArgs = z.infer<typeof editMessageInput>;
 
 export interface DeleteMessageArgs {
   readonly channelId: string;
@@ -80,11 +99,6 @@ interface RawMessage {
   readonly author: { readonly id: string; readonly username: string };
   readonly content: string;
   readonly timestamp: string;
-}
-
-interface SendMessageBody {
-  readonly content: string;
-  message_reference?: { readonly message_id: string };
 }
 
 export interface MessageSummary {
@@ -127,10 +141,13 @@ export const sendMessage = async (
   args: SendMessageArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const body: SendMessageBody = { content: args.content };
-  if (args.replyTo) {
-    body.message_reference = { message_id: args.replyTo };
-  }
+  const body: Record<string, unknown> = {};
+  if (args.content !== undefined) body.content = args.content;
+  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+  if (args.components) body.components = normalizeComponents(args.components);
+  if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
+  if (args.tts !== undefined) body.tts = args.tts;
+  if (args.replyTo) body.message_reference = { message_id: args.replyTo };
 
   const result = await attempt('send_message', () =>
     ctx.discord.request<RawMessage>('POST', `/channels/${args.channelId}/messages`, { body }),
@@ -143,11 +160,16 @@ export const editMessage = async (
   args: EditMessageArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
+  const body: Record<string, unknown> = {};
+  if (args.content !== undefined) body.content = args.content;
+  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+  if (args.components) body.components = normalizeComponents(args.components);
+
   const result = await attempt('edit_message', () =>
     ctx.discord.request<RawMessage>(
       'PATCH',
       `/channels/${args.channelId}/messages/${args.messageId}`,
-      { body: { content: args.content } },
+      { body },
     ),
   );
   if (!result.ok) return errorResult(result.error);
@@ -187,7 +209,9 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
     'send_message',
     {
       title: 'Send message',
-      description: 'Send a message to a Discord channel, optionally replying to an existing message.',
+      description:
+        'Send a message to a Discord channel with content, embeds, and/or components ' +
+        '(buttons, select menus). Optionally reply to a message, set allowed mentions, or use TTS.',
       inputSchema: sendMessageInput,
     },
     async (args) => sendMessage(args, ctx),
@@ -196,7 +220,7 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
     'edit_message',
     {
       title: 'Edit message',
-      description: 'Edit the content of an existing message.',
+      description: 'Edit a message: content, embeds, and/or components.',
       inputSchema: editMessageInput,
       annotations: IDEMPOTENT,
     },
