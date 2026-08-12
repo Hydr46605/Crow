@@ -127,3 +127,97 @@ describe('deleteMessage', () => {
     expect(textOf(result)).toContain('Deleted message 9');
   });
 });
+
+describe('sendMessage with embeds and components', () => {
+  it('includes embeds, components, mentions, and tts in the body', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawMessage;
+    });
+
+    await sendMessage(
+      {
+        channelId: '123456789012345678',
+        embeds: [{ title: 'Hi', color: '#ff0000' }],
+        components: [
+          {
+            type: 'actionRow',
+            components: [{ type: 'button', style: 'primary', customId: 'b', label: 'Go' }],
+          },
+        ],
+        allowedMentions: { parse: ['users'] },
+        tts: true,
+      },
+      createContext(discord),
+    );
+
+    expect(captured?.o.body).toEqual({
+      embeds: [{ title: 'Hi', color: 0xff0000 }],
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 1,
+              label: 'Go',
+              custom_id: 'b',
+              url: undefined,
+              emoji: undefined,
+              disabled: undefined,
+            },
+          ],
+        },
+      ],
+      allowed_mentions: { parse: ['users'], roles: undefined, users: undefined, replied_user: undefined },
+      tts: true,
+    });
+  });
+});
+
+describe('editMessage with embeds', () => {
+  it('patches embeds and components', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawMessage;
+    });
+
+    await editMessage(
+      {
+        channelId: '1',
+        messageId: '9',
+        embeds: [{ title: 'New' }],
+        components: [
+          {
+            type: 'actionRow',
+            components: [{ type: 'button', style: 'danger', customId: 'del', label: 'Delete' }],
+          },
+        ],
+      },
+      createContext(discord),
+    );
+
+    expect(captured?.m).toBe('PATCH');
+    expect(captured?.o.body).toEqual({
+      embeds: [{ title: 'New' }],
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 4,
+              label: 'Delete',
+              custom_id: 'del',
+              url: undefined,
+              emoji: undefined,
+              disabled: undefined,
+            },
+          ],
+        },
+      ],
+    });
+  });
+});
