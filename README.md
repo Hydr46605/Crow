@@ -29,13 +29,16 @@ and registering it.
 
 - **Discovery** — list guilds, members, channels, and bans so the agent can select its target.
 - **Messaging** — read, send, edit, and delete messages.
-- **Channels** — inspect, configure (name, description, NSFW, slowmode), create, and delete channels.
+- **Embeds** — build rich embeds with Discord's limits enforced.
+- **Components** — send messages with buttons and select menus (send-only for now).
+- **Channels** — full control: text/voice/forum settings, threads, and permission overwrites.
 - **Guild config** — set the guild name, description, and rules channel.
+- **Webhooks** — create, manage, and execute webhooks.
 - **Moderation** — kick and ban behind an explicit consent gate; list and unban.
 - **Raw REST** — a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
-Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`) require an
-explicit `"confirm": true` consent flag.
+Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
+`delete_webhook`) require an explicit `"confirm": true` consent flag.
 
 Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) plus human-readable titles and per-field descriptions, so clients can present and
@@ -48,8 +51,10 @@ permission the tools safely.
 | Health | `ping` |
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
 | Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message` |
-| Channels | `modify_channel`, `create_channel`, `delete_channel` |
+| Embeds | `create_embed` |
+| Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions` |
 | Guild config | `modify_guild` |
+| Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |
 | Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |
 | Raw | `discord_request` |
 
