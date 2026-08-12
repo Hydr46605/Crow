@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/crow-logo.png" alt="Crow logo" width="180" />
+</p>
+
 # Crow
 
 A Discord toolkit for AI agents.
@@ -52,7 +56,7 @@ permission the tools safely.
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
 | Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message` |
 | Embeds | `create_embed` |
-| Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions` |
+| Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
 | Guild config | `modify_guild` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |
 | Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |

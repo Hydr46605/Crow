@@ -5,7 +5,8 @@
 - Embeds: `create_embed` plus `embeds` support on `send_message`, `edit_message`, and `execute_webhook`, with Discord's limits enforced.
 - Components (send-only): buttons (all 5 styles), string/user/role/mentionable/channel select menus, and action rows, attachable to messages and webhooks.
 - Webhooks: `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, and `execute_webhook` (via the webhook token).
-- Channels: `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions` (named permissions), plus voice/forum settings and richer summaries.
+- Channels: `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions` and `delete_channel_permissions` (named permissions), plus voice/forum settings and richer summaries.
+- Added a project logo (`assets/crow-logo.png`) and integrated it into the README.
 ### Changed
 - `send_message` now supports embeds, components, allowed mentions, and TTS; `edit_message` supports embeds and components.
 - `modify_channel`/`create_channel` now support voice settings, forum settings, and permission overwrites.

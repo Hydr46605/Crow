@@ -96,6 +96,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `create_thread` | `channelId`, `name`, `messageId?`, `type?`, `autoArchiveDuration?`, `rateLimitPerUser?` | Create a thread, or start one from a message. |
 | `modify_thread` | `threadId`, `name?`, `archived?`, `locked?`, `autoArchiveDuration?`, `rateLimitPerUser?`, `appliedTags?` | Modify a thread. |
 | `edit_channel_permissions` | `channelId`, `overwriteId`, `type`, `allow?`, `deny?` | Set a role/member permission overwrite (named permissions). |
+| `delete_channel_permissions` | `channelId`, `overwriteId` | Remove a role/member permission overwrite. |
 | `modify_guild` | `guildId`, `name?`, `description?`, `rulesChannelId?` | Modify guild name, description, rules channel. |
 
 ### Webhooks
