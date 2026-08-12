@@ -4,6 +4,7 @@ import {
   createChannel,
   createThread,
   deleteChannel,
+  deleteChannelPermissions,
   editChannelPermissions,
   getChannel,
   listActiveThreads,
@@ -286,5 +287,24 @@ describe('editChannelPermissions', () => {
       deny: (1n << 11n).toString(),
     });
     expect(textOf(result)).toContain('role r1');
+  });
+});
+
+describe('deleteChannelPermissions', () => {
+  it('deletes a permission overwrite', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return null;
+    });
+
+    const result = await deleteChannelPermissions(
+      { channelId: '1', overwriteId: 'r1' },
+      createContext(discord),
+    );
+
+    expect(captured?.m).toBe('DELETE');
+    expect(captured?.r).toBe('/channels/1/permissions/r1');
+    expect(textOf(result)).toContain('overwrite r1');
   });
 });

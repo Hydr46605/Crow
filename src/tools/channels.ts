@@ -204,6 +204,11 @@ const editChannelPermissionsInput = {
   deny: z.array(permissionName).optional().describe('Permissions to deny.'),
 };
 
+const deleteChannelPermissionsInput = {
+  channelId: snowflake.describe('The ID of the channel.'),
+  overwriteId: snowflake.describe('The role or member ID whose overwrite to remove.'),
+};
+
 export interface ListChannelsArgs {
   readonly guildId: string;
 }
@@ -222,6 +227,11 @@ export interface ListActiveThreadsArgs {
 export type CreateThreadArgs = z.infer<z.ZodObject<typeof createThreadInput>>;
 export type ModifyThreadArgs = z.infer<z.ZodObject<typeof modifyThreadInput>>;
 export type EditChannelPermissionsArgs = z.infer<z.ZodObject<typeof editChannelPermissionsInput>>;
+
+export interface DeleteChannelPermissionsArgs {
+  readonly channelId: string;
+  readonly overwriteId: string;
+}
 
 interface RawOverwrite {
   readonly id: string;
@@ -510,6 +520,22 @@ export const editChannelPermissions = async (
   );
 };
 
+export const deleteChannelPermissions = async (
+  args: DeleteChannelPermissionsArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('delete_channel_permissions', () =>
+    ctx.discord.request<unknown>(
+      'DELETE',
+      `/channels/${args.channelId}/permissions/${args.overwriteId}`,
+    ),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(
+    `Deleted permission overwrite ${args.overwriteId} on channel ${args.channelId}.`,
+  );
+};
+
 export const registerChannelTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'list_channels',
@@ -602,5 +628,16 @@ export const registerChannelTools = (server: McpServer, ctx: CrowContext): void 
       annotations: IDEMPOTENT,
     },
     async (args) => editChannelPermissions(args, ctx),
+  );
+  server.registerTool(
+    'delete_channel_permissions',
+    {
+      title: 'Delete channel permissions',
+      description:
+        'Remove a role or member permission overwrite from a channel, reverting it to channel defaults.',
+      inputSchema: deleteChannelPermissionsInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => deleteChannelPermissions(args, ctx),
   );
 };
