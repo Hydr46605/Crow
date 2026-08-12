@@ -22,15 +22,15 @@ Releases follow [Semantic Versioning](https://semver.org) and
 [Conventional Commits](https://www.conventionalcommits.org). `.github/workflows/release.yml`
 supports two paths:
 
-- **Manual** — trigger `workflow_dispatch` with a version. It bumps the version, generates the
+- **Manual**: trigger `workflow_dispatch` with a version. It bumps the version, generates the
   changelog from conventional commits, tags, and publishes.
-- **Tag push** — pushing a `v*` tag runs the same pipeline.
+- **Tag push**: pushing a `v*` tag runs the same pipeline.
 
-Each release publishes to npm (unless the dry-run flag is set) and creates a GitHub Release with
-the generated changelog.
+Each release typechecks, builds, runs the tests, and creates a GitHub Release with the generated
+changelog.
 
 ## Commit convention
 
-- `feat: ...` — a new capability (minor version).
-- `fix: ...` — a bug fix (patch version).
-- `BREAKING CHANGE:` in the footer — major version.
+- `feat: ...` adds a new capability (minor version).
+- `fix: ...` fixes a bug (patch version).
+- `BREAKING CHANGE:` in the footer bumps the major version.

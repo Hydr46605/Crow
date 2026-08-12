@@ -1,7 +1,7 @@
 # Getting Started
 
 Crow is an [MCP](https://modelcontextprotocol.io) server. It runs as a child process and talks to
-an MCP client over standard input/output, so it has no UI of its own — you connect it to a client
+an MCP client over standard input/output, so it has no UI of its own; you connect it to a client
 such as Claude, Cursor, or another MCP-aware host.
 
 ## Prerequisites
@@ -39,10 +39,10 @@ change where the `crow` launcher is written (default `~/.local/bin`).
 
 Running `crow setup` walks through configuration step by step:
 
-1. **Bot token** — entered invisibly and verified against Discord immediately; a rejected token is
+1. **Bot token**: entered invisibly and verified against Discord immediately; a rejected token is
    re-prompted.
-2. **Bot user ID** — auto-detected from the token, with a chance to confirm or override it.
-3. **Privileged intents** — Crow checks that `GUILD_MEMBERS` (member listing) and `MESSAGE_CONTENT`
+2. **Bot user ID**: auto-detected from the token, with a chance to confirm or override it.
+3. **Privileged intents**: Crow checks that `GUILD_MEMBERS` (member listing) and `MESSAGE_CONTENT`
    (reading message text) are enabled. If one is missing, the wizard tells you exactly which one,
    waits for you to enable it in the Developer Portal, and re-checks when you confirm.
 

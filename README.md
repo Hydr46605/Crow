@@ -8,8 +8,8 @@ A Discord toolkit for AI agents.
 
 Crow is an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server built on the
 [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk). It gives AI
-agents first-class access to Discord — discovery, messaging, channels, moderation, and arbitrary
-REST calls — through a small set of typed, consent-aware tools.
+agents first-class access to Discord: discovery, messaging, channels, moderation, and arbitrary
+REST calls, through a small set of typed, consent-aware tools.
 
 ## Links
 
@@ -31,15 +31,15 @@ and registering it.
 
 ## Capabilities
 
-- **Discovery** — list guilds, members, channels, and bans so the agent can select its target.
-- **Messaging** — read, send, edit, and delete messages.
-- **Embeds** — build rich embeds with Discord's limits enforced.
-- **Components** — send messages with buttons and select menus (send-only for now).
-- **Channels** — full control: text/voice/forum settings, threads, and permission overwrites.
-- **Guild config** — set the guild name, description, and rules channel.
-- **Webhooks** — create, manage, and execute webhooks.
-- **Moderation** — kick and ban behind an explicit consent gate; list and unban.
-- **Raw REST** — a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
+- **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
+- **Messaging**: read, send, edit, and delete messages.
+- **Embeds**: build rich embeds with Discord's limits enforced.
+- **Components**: send messages with buttons and select menus (send-only for now).
+- **Channels**: full control: text/voice/forum settings, threads, and permission overwrites.
+- **Guild config**: set the guild name, description, and rules channel.
+- **Webhooks**: create, manage, and execute webhooks.
+- **Moderation**: kick and ban behind an explicit consent gate; list and unban.
+- **Raw REST**: a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
 Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
 `delete_webhook`) require an explicit `"confirm": true` consent flag.
@@ -67,7 +67,7 @@ consent model.
 
 ## Quick Start
 
-Install with one command — it clones the repo, builds it, links the `crow` command onto your PATH,
+Install with one command, which clones the repo, builds it, links the `crow` command onto your PATH,
 and drops you into the setup wizard:
 
 ```bash
@@ -87,7 +87,7 @@ curl -o install.bat https://raw.githubusercontent.com/Hydr46605/Crow/main/instal
 ```
 
 The wizard asks for your bot token, detects the bot user ID, verifies the token against Discord,
-and checks that the privileged intents Crow needs (`GUILD_MEMBERS`, `MESSAGE_CONTENT`) are enabled —
+and checks that the privileged intents Crow needs (`GUILD_MEMBERS`, `MESSAGE_CONTENT`) are enabled,
 prompting you to fix and re-check them if they are not.
 
 ## Command line
@@ -133,7 +133,7 @@ npm start
 - Node.js `>= 22` (CI runs against 22 and 24).
 - ESM-only.
 - Discord API v10 via `discord.js`.
-- Distributed via GitHub (not npm) — install with the scripts above.
+- Distributed via GitHub (not npm); install with the scripts above.
 - Pre-1.0: the tool surface may still change during the `0.x` line.
 
 ## License

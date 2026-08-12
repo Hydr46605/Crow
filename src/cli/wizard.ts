@@ -13,7 +13,7 @@ interface ValidatedToken {
 }
 
 const printBanner = (): void => {
-  process.stdout.write(`\n${bold('Crow')} ${cyan(`v${VERSION}`)} — setup wizard\n`);
+  process.stdout.write(`\n${bold('Crow')} ${cyan(`v${VERSION}`)}: setup wizard\n`);
   info(`Credentials will be stored at ${configFilePath()}`);
 };
 
@@ -60,7 +60,7 @@ const promptForUserId = async (detected?: string): Promise<string> => {
     const id = await ask('Bot user ID:');
     if (SNOWFLAKE_PATTERN.test(id)) return id;
     failure(
-      'Enter the bot user ID (17-20 digit snowflake) — Developer Portal → Bot, next to the bot username.',
+      'Enter the bot user ID (17-20 digit snowflake). Find it in Developer Portal → Bot, next to the bot username.',
     );
   }
 };
@@ -82,7 +82,7 @@ const ensureIntents = async (discord: DiscordClient, initial: DoctorResult): Pro
 
     warning('Enable the missing privileged intents in the Discord Developer Portal.');
     if (!(await confirm('Fixed them? Recheck now?'))) {
-      warning('Continuing without the missing intents — some tools will fail until they are enabled.');
+      warning('Continuing without the missing intents; some tools will fail until they are enabled.');
       break;
     }
     result = await runDoctor(discord);

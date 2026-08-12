@@ -12,7 +12,7 @@ maintainer directly.
 ## Keeping your token safe
 
 - Never commit `.env` or a real token. `.env` is git-ignored; only `.env.example` is tracked.
-- `CROW_BOT_TOKEN` is loaded into memory only, validated to reject whitespace, and never logged —
+- `CROW_BOT_TOKEN` is loaded into memory only, validated to reject whitespace, and never logged;
   error messages are scrubbed with `[REDACTED]` before being returned or printed.
 - The `discord_request` tool can reach any endpoint the bot can; the token stays server-side and is
   never exposed to the caller.

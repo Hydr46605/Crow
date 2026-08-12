@@ -81,10 +81,10 @@ export const summarizeDoctor = (result: DoctorResult): DoctorSummary => {
 
   if (result.intents) {
     if (result.intents.guildMembers === 'disabled') {
-      problems.push('GUILD_MEMBERS intent is disabled — list_members will fail.');
+      problems.push('GUILD_MEMBERS intent is disabled; list_members will fail.');
     }
     if (result.intents.messageContent === 'disabled') {
-      problems.push('MESSAGE_CONTENT intent is disabled — read_messages will return empty content.');
+      problems.push('MESSAGE_CONTENT intent is disabled; read_messages will return empty content.');
     }
   }
 

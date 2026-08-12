@@ -7,7 +7,7 @@ Crow exposes Discord capabilities as MCP tools. Every tool is a self-contained m
 
 A tool module exports:
 
-1. Pure handlers — the business logic, unit-testable without the MCP layer.
+1. Pure handlers: the business logic, unit-testable without the MCP layer.
 2. `register<Name>Tool(s)(server, ctx)` functions that bind the handlers to the MCP server with a
    Zod input schema.
 
@@ -17,10 +17,10 @@ token redaction on errors. Handlers normalize errors with the `attempt` helper.
 
 Shared building blocks live alongside the tools:
 
-- `embeds.ts` — validated embed schema + normalization (with Discord's limits enforced).
-- `components.ts` — message-component schemas (buttons, selects, action rows) + normalization.
-- `permissions.ts` — named Discord permission ↔ bitfield conversion.
-- `channel-types.ts` — channel type codes and friendly names.
+- `embeds.ts`: validated embed schema + normalization (with Discord's limits enforced).
+- `components.ts`: message-component schemas (buttons, selects, action rows) + normalization.
+- `permissions.ts`: named Discord permission to bitfield conversion.
+- `channel-types.ts`: channel type codes and friendly names.
 
 ## Selection pipeline
 
@@ -70,7 +70,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 ### Discovery
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
-| `list_guilds` | — | List the guilds the bot is a member of. |
+| `list_guilds` | | List the guilds the bot is a member of. |
 | `get_guild` | `guildId` | Get details for a single guild. |
 | `list_members` | `guildId`, `query?`, `limit?`, `after?` | List guild members (optionally by username search). |
 | `get_member` | `guildId`, `userId` | Get a single guild member. |
@@ -130,9 +130,9 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 
 | Module | Status | Purpose |
 | --- | --- | --- |
-| `embeds` | ✅ done | Create rich embeds. |
-| `components` | ✅ send-only | Build messages with buttons and select menus (interaction runtime planned). |
-| `webhooks` | ✅ done | Manage and execute webhooks. |
-| `invites` | 🚧 planned | Generate invite links. |
-| `emojis` | 🚧 planned | Manage server emojis. |
-| `interactions` | 🚧 0.6.0 | Runtime for handling button/select interactions. |
+| `embeds` | done | Create rich embeds. |
+| `components` | send-only | Build messages with buttons and select menus (interaction runtime planned). |
+| `webhooks` | done | Manage and execute webhooks. |
+| `invites` | planned | Generate invite links. |
+| `emojis` | planned | Manage server emojis. |
+| `interactions` | 0.6.0 | Runtime for handling button/select interactions. |

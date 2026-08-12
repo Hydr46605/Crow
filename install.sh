@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Crow installer (POSIX sh — Linux, macOS, and Git Bash).
+# Crow installer (POSIX sh for Linux, macOS, and Git Bash).
 #
 #   curl -fsSL https://raw.githubusercontent.com/Hydr46605/Crow/main/install.sh | sh
 #

@@ -5,7 +5,7 @@ export const printHelp = (): void => {
   process.stdout.write(
     [
       '',
-      `${bold('Crow')} ${cyan(`v${VERSION}`)} — a Discord toolkit for AI agents (MCP server).`,
+      `${bold('Crow')} ${cyan(`v${VERSION}`)}: a Discord toolkit for AI agents (MCP server).`,
       '',
       `${bold('Usage:')} crow [command]`,
       '',
