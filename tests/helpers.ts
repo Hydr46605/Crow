@@ -1,4 +1,7 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { ActionRuntime } from '../src/actions/runtime.js';
 import type { CrowContext } from '../src/context.js';
 import type {
   ApiRoute,
@@ -13,9 +16,10 @@ export interface RecordedRequest {
   readonly options: DiscordRequestOptions;
 }
 
-export const createContext = (discord: DiscordClient): CrowContext => ({
+export const createContext = (discord: DiscordClient, actions?: ActionRuntime): CrowContext => ({
   config: { botUserId: '123456789012345678', botToken: 'test-token' },
   discord,
+  actions: actions ?? new ActionRuntime(join(tmpdir(), 'crow-test-actions.json')),
 });
 
 export const textOf = (result: CallToolResult): string => {

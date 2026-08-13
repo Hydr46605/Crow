@@ -1,4 +1,5 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { ActionRuntime } from './actions/runtime.js';
 import { BOT_TOKEN_VAR, loadConfig } from './config.js';
 import { DiscordClient } from './discord/client.js';
 import { redactSecrets } from './security/redact.js';
@@ -8,7 +9,9 @@ import { createServer } from './server.js';
 export const serve = async (): Promise<void> => {
   const config = loadConfig();
   const discord = new DiscordClient(config.botToken);
-  const server = createServer({ config, discord });
+  const actions = new ActionRuntime();
+  actions.load();
+  const server = createServer({ config, discord, actions });
 
   const shutdown = async (): Promise<void> => {
     await server.close();
