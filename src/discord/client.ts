@@ -6,10 +6,20 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 /** A Discord REST route. Must start with a slash (e.g. `/channels/{id}/messages`). */
 export type ApiRoute = string;
 
+/** A file to attach to a multipart request. Mirrors discord.js `RawFile`. */
+export interface DiscordFile {
+  readonly name: string;
+  readonly data: Buffer;
+  readonly contentType?: string;
+  readonly key?: string;
+}
+
 export interface DiscordRequestOptions {
   readonly body?: unknown;
   readonly query?: Record<string, string | number | boolean | undefined>;
   readonly reason?: string;
+  readonly files?: readonly DiscordFile[];
+  readonly appendToFormData?: boolean;
 }
 
 /** Low-level request executor. The default implementation wraps discord.js `REST`. */
@@ -65,12 +75,18 @@ interface RestRequestData {
   body?: unknown;
   query?: URLSearchParams;
   reason?: string;
+  files?: DiscordFile[];
+  appendToFormData?: boolean;
 }
 
 const toRequestData = (options: DiscordRequestOptions): RestRequestData => {
   const data: RestRequestData = {};
   if (options.body !== undefined) data.body = options.body;
   if (options.reason !== undefined) data.reason = options.reason;
+  if (options.files !== undefined) {
+    data.files = options.files.map((file) => ({ ...file }));
+  }
+  if (options.appendToFormData !== undefined) data.appendToFormData = options.appendToFormData;
   if (options.query) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(options.query)) {

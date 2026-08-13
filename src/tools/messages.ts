@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
+import type { DiscordFile } from '../discord/client.js';
+import { fileSourceShape, MAX_ATTACHMENT_BYTES, requireSingleFileSource, resolveFile } from '../files.js';
 import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { componentsSchema, normalizeComponents } from './components.js';
@@ -9,6 +11,18 @@ import { requireConsent } from './consent.js';
 import { embedsSchema, normalizeEmbeds } from './embeds.js';
 import { errorResult, textResult } from './result.js';
 import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake } from './schemas.js';
+
+const attachmentSchema = fileSourceShape
+  .extend({
+    description: z.string().max(1024).optional().describe('Alt text for the attachment.'),
+  })
+  .superRefine(requireSingleFileSource);
+
+const attachmentsSchema = z
+  .array(attachmentSchema)
+  .min(1)
+  .max(10)
+  .describe('Up to 10 file attachments.');
 
 const readMessagesInput = {
   channelId: snowflake.describe('The ID of the channel to read messages from.'),
@@ -35,15 +49,16 @@ const sendMessageInput = z
       .describe('The message content (1-2000 characters).'),
     embeds: embedsSchema.optional(),
     components: componentsSchema.optional(),
+    attachments: attachmentsSchema.optional(),
     allowedMentions: allowedMentionsSchema,
     tts: z.boolean().optional().describe('Whether this is a text-to-speech message.'),
     replyTo: snowflake.optional().describe('The ID of the message to reply to.'),
   })
   .superRefine((args, ctx) => {
-    if (!args.content && !args.embeds) {
+    if (!args.content && !args.embeds && !args.attachments) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide "content", "embeds", or both.',
+        message: 'Provide "content", "embeds", "attachments", or a combination.',
       });
     }
   });
@@ -60,12 +75,13 @@ const editMessageInput = z
       .describe('The new message content (1-2000 characters).'),
     embeds: embedsSchema.optional(),
     components: componentsSchema.optional(),
+    attachments: attachmentsSchema.optional(),
   })
   .superRefine((args, ctx) => {
-    if (!args.content && !args.embeds && !args.components) {
+    if (!args.content && !args.embeds && !args.components && !args.attachments) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide at least one of "content", "embeds", or "components".',
+        message: 'Provide at least one of "content", "embeds", "components", or "attachments".',
       });
     }
   });
@@ -119,6 +135,27 @@ export const summarizeMessage = (message: RawMessage): MessageSummary => ({
   createdAt: message.timestamp,
 });
 
+const resolveAttachments = async (
+  attachments: readonly { name?: string; path?: string; url?: string; data?: string }[],
+): Promise<DiscordFile[]> => {
+  const files: DiscordFile[] = [];
+  for (const attachment of attachments) {
+    const resolved = await resolveFile(attachment, MAX_ATTACHMENT_BYTES);
+    files.push({ name: resolved.name, data: resolved.data, contentType: resolved.contentType });
+  }
+  return files;
+};
+
+const attachmentsBody = (
+  attachments: readonly { description?: string }[],
+  files: readonly DiscordFile[],
+): { id: number; filename?: string; description?: string }[] =>
+  attachments.map((attachment, index) => ({
+    id: index,
+    filename: files[index]?.name,
+    description: attachment.description,
+  }));
+
 export const readMessages = async (
   args: ReadMessagesArgs,
   ctx: CrowContext,
@@ -141,17 +178,23 @@ export const sendMessage = async (
   args: SendMessageArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const body: Record<string, unknown> = {};
-  if (args.content !== undefined) body.content = args.content;
-  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-  if (args.components) body.components = normalizeComponents(args.components);
-  if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
-  if (args.tts !== undefined) body.tts = args.tts;
-  if (args.replyTo) body.message_reference = { message_id: args.replyTo };
+  const result = await attempt('send_message', async () => {
+    const files = args.attachments ? await resolveAttachments(args.attachments) : [];
 
-  const result = await attempt('send_message', () =>
-    ctx.discord.request<RawMessage>('POST', `/channels/${args.channelId}/messages`, { body }),
-  );
+    const body: Record<string, unknown> = {};
+    if (args.content !== undefined) body.content = args.content;
+    if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+    if (args.components) body.components = normalizeComponents(args.components);
+    if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
+    if (args.tts !== undefined) body.tts = args.tts;
+    if (args.replyTo) body.message_reference = { message_id: args.replyTo };
+    if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+
+    return ctx.discord.request<RawMessage>('POST', `/channels/${args.channelId}/messages`, {
+      body,
+      files: files.length > 0 ? files : undefined,
+    });
+  });
   if (!result.ok) return errorResult(result.error);
   return textResult(JSON.stringify(summarizeMessage(result.value), null, 2));
 };
@@ -160,18 +203,21 @@ export const editMessage = async (
   args: EditMessageArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const body: Record<string, unknown> = {};
-  if (args.content !== undefined) body.content = args.content;
-  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-  if (args.components) body.components = normalizeComponents(args.components);
+  const result = await attempt('edit_message', async () => {
+    const files = args.attachments ? await resolveAttachments(args.attachments) : [];
 
-  const result = await attempt('edit_message', () =>
-    ctx.discord.request<RawMessage>(
+    const body: Record<string, unknown> = {};
+    if (args.content !== undefined) body.content = args.content;
+    if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+    if (args.components) body.components = normalizeComponents(args.components);
+    if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+
+    return ctx.discord.request<RawMessage>(
       'PATCH',
       `/channels/${args.channelId}/messages/${args.messageId}`,
-      { body },
-    ),
-  );
+      { body, files: files.length > 0 ? files : undefined },
+    );
+  });
   if (!result.ok) return errorResult(result.error);
   return textResult(JSON.stringify(summarizeMessage(result.value), null, 2));
 };
@@ -210,8 +256,8 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
     {
       title: 'Send message',
       description:
-        'Send a message to a Discord channel with content, embeds, and/or components ' +
-        '(buttons, select menus). Optionally reply to a message, set allowed mentions, or use TTS.',
+        'Send a message to a Discord channel with content, embeds, components (buttons, select ' +
+        'menus), and/or file attachments. Optionally reply to a message, set allowed mentions, or use TTS.',
       inputSchema: sendMessageInput,
     },
     async (args) => sendMessage(args, ctx),
@@ -220,7 +266,7 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
     'edit_message',
     {
       title: 'Edit message',
-      description: 'Edit a message: content, embeds, and/or components.',
+      description: 'Edit a message: content, embeds, components, and/or attachments.',
       inputSchema: editMessageInput,
       annotations: IDEMPOTENT,
     },
