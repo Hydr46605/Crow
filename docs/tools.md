@@ -11,7 +11,8 @@ A tool module exports:
 2. `register<Name>Tool(s)(server, ctx)` functions that bind the handlers to the MCP server with a
    Zod input schema.
 
-`ctx` is the shared `CrowContext` (`config` + `discord` REST client) handed to every handler.
+`ctx` is the shared `CrowContext` (`config`, `discord` REST client, and `actions` runtime) handed to
+every handler.
 All Discord HTTP flows through the single `DiscordClient`, which adds auth, rate limiting, and
 token redaction on errors. Handlers normalize errors with the `attempt` helper.
 
@@ -21,6 +22,8 @@ Shared building blocks live alongside the tools:
 - `components.ts`: message-component schemas (buttons, selects, action rows) + normalization.
 - `permissions.ts`: named Discord permission to bitfield conversion.
 - `channel-types.ts`: channel type codes and friendly names.
+- `files.ts`: file-source resolution (path/url/data) with size limits and content-type inference.
+- `actions/`: the action registry plus the pure `resolveInteraction` hook.
 
 ## Selection pipeline
 
@@ -37,25 +40,31 @@ Most actions are per-guild, so a typical flow is:
 `create_embed` validates an embed locally and returns the exact JSON Discord expects, so an agent
 can check limits before sending.
 
-Components (buttons, string/user/role/mentionable/channel select menus) are **send-only** in 0.5.0:
-Crow builds and attaches them, but does not yet receive the resulting interactions. A future runtime
-will let the agent register handlers for `custom_id` values.
+`send_message` and `edit_message` also accept `attachments` (files, images, GIFs) resolved from a
+local path, a URL, or inline base64/data-URI data.
+
+Components (buttons, string/user/role/mentionable/channel select menus) can be attached to messages.
+Crow does not yet connect to the Gateway to receive the resulting interactions live, but the actions
+runtime registers replies for `custom_id` values now, and its `resolveInteraction` hook is the
+extension point for the future Gateway transport.
 
 ## Consent model
 
 Destructive tools require an explicit `"confirm": true` argument. Without it they return an error
 and take no action. This applies to `kick_member`, `ban_member`, `delete_channel`,
-`delete_message`, and `delete_webhook`.
+`delete_message`, `delete_webhook`, `delete_invite`, `delete_emoji`, and `delete_sticker`.
 
 ## Annotations
 
 Every tool carries MCP annotations so clients can reason about safety without reading source:
 
-- Read-only tools (`list_*`, `get_*`, `read_messages`, `ping`, `create_embed`) set `readOnlyHint`.
+- Read-only tools (`list_*`, `get_*`, `read_messages`, `ping`, `create_embed`, `list_actions`)
+  set `readOnlyHint`.
 - Destructive tools (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
-  `delete_webhook`) set `destructiveHint`.
+  `delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
-  `modify_webhook`, `edit_channel_permissions`, `unban_member`) set `idempotentHint`.
+  `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `unban_member`,
+  `register_action`, `remove_action`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
 
 Each tool also has a human-readable `title` and per-field descriptions in its input schema.
@@ -81,8 +90,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
 | `read_messages` | `channelId`, `limit?`, `before?`, `after?`, `around?` | Read recent channel messages. |
-| `send_message` | `channelId`, `content?`, `embeds?`, `components?`, `allowedMentions?`, `tts?`, `replyTo?` | Send a channel message. |
-| `edit_message` | `channelId`, `messageId`, `content?`, `embeds?`, `components?` | Edit a message. |
+| `send_message` | `channelId`, `content?`, `embeds?`, `components?`, `attachments?`, `allowedMentions?`, `tts?`, `replyTo?` | Send a channel message. |
+| `edit_message` | `channelId`, `messageId`, `content?`, `embeds?`, `components?`, `attachments?` | Edit a message. |
 | `delete_message` | `channelId`, `messageId`, `confirm` | Delete a message (consent-gated). |
 | `create_embed` | `embed` | Validate an embed and return its Discord JSON. |
 
@@ -109,6 +118,43 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `delete_webhook` | `webhookId`, `confirm` | Delete a webhook (consent-gated). |
 | `execute_webhook` | `webhookId`, `webhookToken`, `content?`, `embeds?`, `components?`, `username?`, `avatarUrl?`, `tts?`, `allowedMentions?`, `threadId?`, `wait?` | Send a message through a webhook token. |
 
+### Invites
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_guild_invites` | `guildId` | List a guild's invites. |
+| `list_channel_invites` | `channelId` | List a channel's invites. |
+| `get_invite` | `code`, `withCounts?`, `withExpiration?` | Get invite metadata by code or URL. |
+| `get_vanity_url` | `guildId` | Get a guild's vanity URL, if any. |
+| `create_invite` | `channelId`, `maxAge?`, `maxUses?`, `temporary?`, `unique?`, `targetType?`, `targetUserId?`, `targetApplicationId?`, `reason?` | Create an invite. |
+| `delete_invite` | `code`, `confirm` | Delete an invite (consent-gated). |
+
+### Emojis
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_emojis` | `guildId` | List a guild's custom emojis. |
+| `get_emoji` | `guildId`, `emojiId` | Get a single emoji. |
+| `create_emoji` | `guildId`, `name`, `image`, `roles?`, `reason?` | Create an emoji from a data URI or file source. |
+| `modify_emoji` | `guildId`, `emojiId`, `name?`, `roles?`, `reason?` | Modify an emoji. |
+| `delete_emoji` | `guildId`, `emojiId`, `confirm`, `reason?` | Delete an emoji (consent-gated). |
+
+### Stickers
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_stickers` | `guildId` | List a guild's stickers. |
+| `get_sticker` | `guildId`, `stickerId` | Get a single sticker. |
+| `list_sticker_packs` | | List available sticker packs. |
+| `get_sticker_pack` | `packId` | Get a sticker pack. |
+| `create_sticker` | `guildId`, `name`, `description?`, `tags`, `file`, `reason?` | Create a sticker from a file. |
+| `modify_sticker` | `guildId`, `stickerId`, `name?`, `description?`, `tags?`, `reason?` | Modify a sticker. |
+| `delete_sticker` | `guildId`, `stickerId`, `confirm`, `reason?` | Delete a sticker (consent-gated). |
+
+### Actions
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `register_action` | `customId`, `content?`, `embeds?`, `ephemeral?` | Register or replace the reply for a component custom_id. |
+| `list_actions` | | List registered actions. |
+| `remove_action` | `customId` | Remove a registered action. |
+
 ### Moderation
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
@@ -131,8 +177,10 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | Module | Status | Purpose |
 | --- | --- | --- |
 | `embeds` | done | Create rich embeds. |
-| `components` | send-only | Build messages with buttons and select menus (interaction runtime planned). |
+| `components` | send-only | Build messages with buttons and select menus. |
 | `webhooks` | done | Manage and execute webhooks. |
-| `invites` | planned | Generate invite links. |
-| `emojis` | planned | Manage server emojis. |
-| `interactions` | 0.6.0 | Runtime for handling button/select interactions. |
+| `attachments` | done | Send files, images, and GIFs on messages. |
+| `invites` | done | Manage invites and vanity URLs. |
+| `emojis` | done | Manage custom emojis. |
+| `stickers` | done | Manage guild stickers and packs. |
+| `interactions` | foundation | Action registry + hook; Gateway transport planned. |

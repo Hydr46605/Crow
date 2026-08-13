@@ -8,8 +8,8 @@ A Discord toolkit for AI agents.
 
 Crow is an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server built on the
 [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk). It gives AI
-agents first-class access to Discord: discovery, messaging, channels, moderation, and arbitrary
-REST calls, through a small set of typed, consent-aware tools.
+agents first-class access to Discord: discovery, messaging, channels, invites, emojis, stickers,
+moderation, and arbitrary REST calls, through a small set of typed, consent-aware tools.
 
 ## Links
 
@@ -38,11 +38,17 @@ and registering it.
 - **Channels**: full control: text/voice/forum settings, threads, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Webhooks**: create, manage, and execute webhooks.
+- **Attachments**: send files, images, and GIFs alongside messages.
+- **Invites**: list, create, inspect, and delete guild and channel invites.
+- **Emojis**: create, list, modify, and delete custom emojis.
+- **Stickers**: create, list, modify, and delete guild stickers, plus sticker packs.
+- **Actions**: register replies for button and select interactions.
 - **Moderation**: kick and ban behind an explicit consent gate; list and unban.
 - **Raw REST**: a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
 Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
-`delete_webhook`) require an explicit `"confirm": true` consent flag.
+`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`) require an explicit
+`"confirm": true` consent flag.
 
 Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) plus human-readable titles and per-field descriptions, so clients can present and
@@ -59,6 +65,10 @@ permission the tools safely.
 | Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
 | Guild config | `modify_guild` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |
+| Invites | `list_guild_invites`, `list_channel_invites`, `get_invite`, `get_vanity_url`, `create_invite`, `delete_invite` |
+| Emojis | `list_emojis`, `get_emoji`, `create_emoji`, `modify_emoji`, `delete_emoji` |
+| Stickers | `list_stickers`, `get_sticker`, `list_sticker_packs`, `get_sticker_pack`, `create_sticker`, `modify_sticker`, `delete_sticker` |
+| Actions | `register_action`, `list_actions`, `remove_action` |
 | Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |
 | Raw | `discord_request` |
 
