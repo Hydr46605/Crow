@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
-import { getMember, listMembers, summarizeMember } from '../../src/tools/members.js';
+import {
+  addRoleToMember,
+  getMember,
+  listMembers,
+  modifyMember,
+  removeRoleFromMember,
+  summarizeMember,
+} from '../../src/tools/members.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
 const rawMember = {
@@ -60,5 +67,60 @@ describe('getMember', () => {
     );
 
     expect(captured?.route).toBe('/guilds/123456789012345678/members/555');
+  });
+});
+
+describe('modifyMember', () => {
+  it('patches only the provided member fields', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await modifyMember(
+      { guildId: 'g', userId: 'u', nick: 'New', timeoutUntil: '2026-09-01T00:00:00.000Z' },
+      createContext(discord),
+    );
+
+    expect(captured?.method).toBe('PATCH');
+    expect(captured?.route).toBe('/guilds/g/members/u');
+    expect(captured?.options.body).toEqual({
+      nick: 'New',
+      communication_disabled_until: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it('sends null to clear a nickname or timeout', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await modifyMember(
+      { guildId: 'g', userId: 'u', nick: null, timeoutUntil: null },
+      createContext(discord),
+    );
+
+    expect(captured?.options.body).toEqual({ nick: null, communication_disabled_until: null });
+  });
+});
+
+describe('member role assignment', () => {
+  it('puts and deletes the member role routes', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await addRoleToMember({ guildId: 'g', userId: 'u', roleId: 'r' }, createContext(discord));
+    expect(captured?.method).toBe('PUT');
+    expect(captured?.route).toBe('/guilds/g/members/u/roles/r');
+
+    await removeRoleFromMember({ guildId: 'g', userId: 'u', roleId: 'r' }, createContext(discord));
+    expect(captured?.method).toBe('DELETE');
+    expect(captured?.route).toBe('/guilds/g/members/u/roles/r');
   });
 });

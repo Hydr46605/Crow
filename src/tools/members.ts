@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
-import { READ_ONLY } from './annotations.js';
+import { IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
 import { snowflake } from './schemas.js';
@@ -27,6 +27,37 @@ const listMembersInput = {
 const getMemberInput = {
   guildId: snowflake.describe('The ID of the guild the member belongs to.'),
   userId: snowflake.describe('The ID of the user to fetch.'),
+};
+
+const modifyMemberInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to modify.'),
+  nick: z.string().min(1).max(32).nullable().optional().describe('New nickname, or null to reset it.'),
+  mute: z.boolean().optional().describe('Whether the member is server-muted in voice channels.'),
+  deaf: z.boolean().optional().describe('Whether the member is server-deafened in voice channels.'),
+  channelId: snowflake
+    .nullable()
+    .optional()
+    .describe('Voice channel to move the member to, or null to disconnect them.'),
+  timeoutUntil: z
+    .string()
+    .datetime({ offset: true })
+    .nullable()
+    .optional()
+    .describe('ISO-8601 timestamp until which the member is timed out, or null to lift the timeout.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const addRoleToMemberInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to add the role to.'),
+  roleId: snowflake.describe('The ID of the role to assign.'),
+};
+
+const removeRoleFromMemberInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to remove the role from.'),
+  roleId: snowflake.describe('The ID of the role to remove.'),
 };
 
 export interface ListMembersArgs {
@@ -97,6 +128,72 @@ export const getMember = async (args: GetMemberArgs, ctx: CrowContext): Promise<
   return textResult(JSON.stringify(summarizeMember(result.value), null, 2));
 };
 
+export interface ModifyMemberArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly nick?: string | null;
+  readonly mute?: boolean;
+  readonly deaf?: boolean;
+  readonly channelId?: string | null;
+  readonly timeoutUntil?: string | null;
+  readonly reason?: string;
+}
+
+export interface MemberRoleArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly roleId: string;
+}
+
+export const modifyMember = async (
+  args: ModifyMemberArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const body: Record<string, unknown> = {};
+  if (args.nick !== undefined) body.nick = args.nick;
+  if (args.mute !== undefined) body.mute = args.mute;
+  if (args.deaf !== undefined) body.deaf = args.deaf;
+  if (args.channelId !== undefined) body.channel_id = args.channelId;
+  if (args.timeoutUntil !== undefined) body.communication_disabled_until = args.timeoutUntil;
+
+  const result = await attempt('modify_member', () =>
+    ctx.discord.request<unknown>('PATCH', `/guilds/${args.guildId}/members/${args.userId}`, {
+      body,
+      reason: args.reason,
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Modified member ${args.userId} in guild ${args.guildId}.`);
+};
+
+export const addRoleToMember = async (
+  args: MemberRoleArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('add_role_to_member', () =>
+    ctx.discord.request<unknown>(
+      'PUT',
+      `/guilds/${args.guildId}/members/${args.userId}/roles/${args.roleId}`,
+    ),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Added role ${args.roleId} to member ${args.userId}.`);
+};
+
+export const removeRoleFromMember = async (
+  args: MemberRoleArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('remove_role_from_member', () =>
+    ctx.discord.request<unknown>(
+      'DELETE',
+      `/guilds/${args.guildId}/members/${args.userId}/roles/${args.roleId}`,
+    ),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Removed role ${args.roleId} from member ${args.userId}.`);
+};
+
 export const registerMemberTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'list_members',
@@ -119,5 +216,37 @@ export const registerMemberTools = (server: McpServer, ctx: CrowContext): void =
       annotations: READ_ONLY,
     },
     async (args) => getMember(args, ctx),
+  );
+  server.registerTool(
+    'modify_member',
+    {
+      title: 'Modify member',
+      description:
+        'Modify a member: nickname, voice mute/deafen, voice channel, or a timeout. ' +
+        'Roles are managed via add_role_to_member and remove_role_from_member.',
+      inputSchema: modifyMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => modifyMember(args, ctx),
+  );
+  server.registerTool(
+    'add_role_to_member',
+    {
+      title: 'Add role to member',
+      description: 'Assign a role to a guild member.',
+      inputSchema: addRoleToMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => addRoleToMember(args, ctx),
+  );
+  server.registerTool(
+    'remove_role_from_member',
+    {
+      title: 'Remove role from member',
+      description: 'Remove a role from a guild member.',
+      inputSchema: removeRoleFromMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => removeRoleFromMember(args, ctx),
   );
 };
