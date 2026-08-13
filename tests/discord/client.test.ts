@@ -50,3 +50,36 @@ describe('DiscordClient.request', () => {
     }
   });
 });
+
+describe('DiscordClient.interactionCallback', () => {
+  it('passes the callback through to the executor', async () => {
+    let captured: { id: string; token: string; callback: unknown } | undefined;
+    const discord = new DiscordClient('token', async () => null, undefined, async (id, token, callback) => {
+      captured = { id, token, callback };
+      return null;
+    });
+
+    await discord.interactionCallback('111', 'interaction-token', { type: 4, data: { content: 'hi' } });
+
+    expect(captured).toEqual({
+      id: '111',
+      token: 'interaction-token',
+      callback: { type: 4, data: { content: 'hi' } },
+    });
+  });
+
+  it('redacts the interaction token from errors', async () => {
+    const discord = new DiscordClient('token', async () => null, undefined, async () => {
+      throw new Error('callback failed with token interaction-secret');
+    });
+
+    try {
+      await discord.interactionCallback('111', 'interaction-secret', { type: 4, data: { content: 'hi' } });
+      throw new Error('expected callback to reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DiscordRequestError);
+      expect((error as Error).message).toContain('[REDACTED]');
+      expect((error as Error).message).not.toContain('interaction-secret');
+    }
+  });
+});

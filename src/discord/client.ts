@@ -46,6 +46,24 @@ export type WebhookExecutor = (
   options: WebhookExecuteOptions,
 ) => Promise<unknown>;
 
+/** The payload for an interaction callback (types 4 or 9). */
+export interface InteractionCallback {
+  readonly type: 4 | 9;
+  readonly data: unknown;
+}
+
+/**
+ * Low-level interaction callback executor. Callbacks authenticate with the
+ * interaction's own token in the URL (not the bot token), so they use `fetch`
+ * against the interaction endpoint directly instead of the discord.js `REST`
+ * client.
+ */
+export type InteractionCallbackExecutor = (
+  interactionId: string,
+  interactionToken: string,
+  callback: InteractionCallback,
+) => Promise<unknown>;
+
 export const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -95,6 +113,28 @@ const toRequestData = (options: DiscordRequestOptions): RestRequestData => {
     data.query = query;
   }
   return data;
+};
+
+const INTERACTION_BASE = 'https://discord.com/api/interactions';
+
+const createInteractionCallbackExecutor = (): InteractionCallbackExecutor => {
+  return async (interactionId, interactionToken, callback) => {
+    const url = `${INTERACTION_BASE}/${interactionId}/${interactionToken}/callback`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(callback),
+    });
+
+    if (response.status === 204) return null;
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = data ? JSON.stringify(data) : response.statusText;
+      throw new DiscordRequestError(detail, response.status);
+    }
+    return data;
+  };
 };
 
 const WEBHOOK_BASE = 'https://discord.com/api/webhooks';
@@ -160,11 +200,18 @@ export class DiscordClient {
   private readonly token: string;
   private readonly execute: RequestExecutor;
   private readonly executeWebhookFn: WebhookExecutor;
+  private readonly executeInteractionCallbackFn: InteractionCallbackExecutor;
 
-  constructor(token: string, execute?: RequestExecutor, executeWebhook?: WebhookExecutor) {
+  constructor(
+    token: string,
+    execute?: RequestExecutor,
+    executeWebhook?: WebhookExecutor,
+    executeInteractionCallback?: InteractionCallbackExecutor,
+  ) {
     this.token = token;
     this.execute = execute ?? createRestExecutor(token);
     this.executeWebhookFn = executeWebhook ?? createWebhookExecutor();
+    this.executeInteractionCallbackFn = executeInteractionCallback ?? createInteractionCallbackExecutor();
   }
 
   /** Performs a raw request against the Discord API and returns the parsed body. */
@@ -201,6 +248,26 @@ export class DiscordClient {
     } catch (error) {
       throw new DiscordRequestError(
         redactSecrets(toErrorMessage(error), [webhookToken]),
+        extractStatus(error),
+      );
+    }
+  }
+
+  /**
+   * Sends an interaction callback (message or modal) through the interaction's
+   * own token. The interaction token is a secret, so it is redacted from any
+   * error surfaced.
+   */
+  async interactionCallback<T>(
+    interactionId: string,
+    interactionToken: string,
+    callback: InteractionCallback,
+  ): Promise<T> {
+    try {
+      return (await this.executeInteractionCallbackFn(interactionId, interactionToken, callback)) as T;
+    } catch (error) {
+      throw new DiscordRequestError(
+        redactSecrets(toErrorMessage(error), [interactionToken]),
         extractStatus(error),
       );
     }
