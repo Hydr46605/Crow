@@ -37,8 +37,9 @@ export const registerActionTools = (server: McpServer, ctx: CrowContext): void =
     {
       title: 'Register action',
       description:
-        'Register or replace the reply fired when a component with the given custom_id is used. ' +
-        'Actions persist across sessions and are dispatched by the interaction runtime.',
+        'Register or replace the action fired when a component or modal with the given custom_id is used. ' +
+        'Use kind "reply" to answer a click directly, or kind "modal" to open a form and answer its submit. ' +
+        'Actions persist across sessions and are dispatched by the gateway runtime.',
       inputSchema: actionSchema,
       annotations: IDEMPOTENT,
     },

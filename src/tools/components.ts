@@ -118,8 +118,43 @@ export const componentsSchema = z
   .max(5)
   .describe('Up to 5 action rows of buttons and select menus.');
 
+/** Discord text-input style numeric codes, keyed by friendly name. */
+export const TEXT_INPUT_STYLES = {
+  short: 1,
+  paragraph: 2,
+} as const;
+
+export type TextInputStyle = keyof typeof TEXT_INPUT_STYLES;
+
+const textInputStyleSchema = z.enum(['short', 'paragraph']);
+
+/** A single text input in a modal (Discord component type 4). */
+export const textInputSchema = z
+  .object({
+    customId: z.string().min(1).max(100).describe('Identifier for this input (1-100 characters).'),
+    label: z.string().min(1).max(45).describe('Input label (1-45 characters).'),
+    style: textInputStyleSchema.describe('Single-line or multiline input.'),
+    required: z.boolean().optional().describe('Whether the input must be filled in.'),
+    placeholder: z.string().min(1).max(100).optional().describe('Placeholder text (1-100 characters).'),
+    minLength: z.number().int().min(0).max(4000).optional().describe('Minimum input length.'),
+    maxLength: z.number().int().min(1).max(4000).optional().describe('Maximum input length.'),
+  })
+  .superRefine((input, ctx) => {
+    if (
+      input.minLength !== undefined &&
+      input.maxLength !== undefined &&
+      input.minLength > input.maxLength
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: '"minLength" must not exceed "maxLength".' });
+    }
+  });
+
+/** A modal's inputs: up to 5 text inputs. */
+export const textInputsSchema = z.array(textInputSchema).min(1).max(5).describe('1-5 text inputs.');
+
 export type EmojiInput = z.infer<typeof emojiSchema>;
 export type ButtonInput = z.infer<typeof buttonSchema>;
+export type TextInputInput = z.infer<typeof textInputSchema>;
 export type SelectOptionInput = z.infer<typeof selectOptionSchema>;
 export type InteractiveComponentInput = z.infer<typeof interactiveComponentSchema>;
 export type ActionRowInput = z.infer<typeof actionRowSchema>;
@@ -191,3 +226,18 @@ export const normalizeComponents = (components: readonly ActionRowInput[]): Reco
     type: 1,
     components: row.components.map(normalizeInteractiveComponent),
   }));
+
+/** Converts a friendly text input to Discord's numeric component JSON (type 4). */
+export const normalizeTextInput = (input: TextInputInput): Record<string, unknown> => ({
+  type: 4,
+  custom_id: input.customId,
+  label: input.label,
+  style: TEXT_INPUT_STYLES[input.style],
+  required: input.required,
+  placeholder: input.placeholder,
+  min_length: input.minLength,
+  max_length: input.maxLength,
+});
+
+export const normalizeTextInputs = (inputs: readonly TextInputInput[]): Record<string, unknown>[] =>
+  inputs.map(normalizeTextInput);

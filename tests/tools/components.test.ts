@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   interactiveComponentSchema,
   normalizeComponents,
+  normalizeTextInputs,
+  textInputSchema,
 } from '../../src/tools/components.js';
 
 describe('normalizeComponents', () => {
@@ -120,5 +122,55 @@ describe('interactiveComponentSchema', () => {
   it('accepts a valid primary button', () => {
     const result = interactiveComponentSchema.safeParse({ type: 'button', style: 'primary', customId: 'x' });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('textInputSchema', () => {
+  it('rejects an input whose minLength exceeds maxLength', () => {
+    const result = textInputSchema.safeParse({
+      customId: 'x',
+      label: 'X',
+      style: 'short',
+      minLength: 10,
+      maxLength: 5,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a valid short input', () => {
+    const result = textInputSchema.safeParse({ customId: 'x', label: 'X', style: 'short', required: true });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('normalizeTextInputs', () => {
+  it('maps friendly inputs to Discord numeric text-input JSON', () => {
+    expect(
+      normalizeTextInputs([
+        { customId: 'a', label: 'A', style: 'short', required: true },
+        { customId: 'b', label: 'B', style: 'paragraph', maxLength: 200 },
+      ]),
+    ).toEqual([
+      {
+        type: 4,
+        custom_id: 'a',
+        label: 'A',
+        style: 1,
+        required: true,
+        placeholder: undefined,
+        min_length: undefined,
+        max_length: undefined,
+      },
+      {
+        type: 4,
+        custom_id: 'b',
+        label: 'B',
+        style: 2,
+        required: undefined,
+        placeholder: undefined,
+        min_length: undefined,
+        max_length: 200,
+      },
+    ]);
   });
 });
