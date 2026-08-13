@@ -24,6 +24,12 @@ describe('parseArgs', () => {
     }
   });
 
+  it('maps gateway aliases', () => {
+    for (const arg of ['gateway', 'daemon']) {
+      expect(parseArgs([arg])).toEqual({ kind: 'gateway' });
+    }
+  });
+
   it('maps version aliases', () => {
     for (const arg of ['--version', '-v', 'version']) {
       expect(parseArgs([arg])).toEqual({ kind: 'version' });

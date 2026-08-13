@@ -5,6 +5,7 @@ import { runDoctorCli } from './cli/doctor.js';
 import { printHelp } from './cli/help.js';
 import { runWizard } from './cli/wizard.js';
 import { loadEnvFiles } from './config.js';
+import { gateway } from './gateway/transport.js';
 import { handleFatal, serve } from './serve.js';
 import { VERSION } from './version.js';
 
@@ -27,6 +28,9 @@ const main = async (): Promise<void> => {
       return;
     case 'doctor':
       await runDoctorCli();
+      return;
+    case 'gateway':
+      await gateway();
       return;
     case 'version':
       process.stdout.write(`${VERSION}\n`);

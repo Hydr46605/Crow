@@ -2,6 +2,7 @@ export type CliCommand =
   | { readonly kind: 'serve' }
   | { readonly kind: 'setup' }
   | { readonly kind: 'doctor' }
+  | { readonly kind: 'gateway' }
   | { readonly kind: 'version' }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly arg: string };
@@ -22,6 +23,9 @@ export const parseArgs = (argv: readonly string[]): CliCommand => {
     case 'doctor':
     case 'check':
       return { kind: 'doctor' };
+    case 'gateway':
+    case 'daemon':
+      return { kind: 'gateway' };
     case '--version':
     case '-v':
     case 'version':

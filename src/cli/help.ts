@@ -14,6 +14,7 @@ export const printHelp = (): void => {
       '  serve              Run the MCP server over stdio.',
       '  setup, wizard      Run the interactive setup wizard.',
       '  doctor, check      Check the bot token and privileged intents.',
+      '  gateway, daemon    Run the always-on interaction gateway daemon.',
       '  --version, -v      Print the version.',
       '  --help, -h         Show this help.',
       '',
