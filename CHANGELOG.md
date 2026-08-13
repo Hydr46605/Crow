@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.0] - 2026-08-24
+### Added
+- `crow gateway` daemon that connects to the Discord Gateway (native WebSocket), identifies with the `GUILDS` intent, and dispatches live interactions with heartbeat ack-tracking, resume, and exponential-backoff reconnect.
+- Modal actions: `register_action` now accepts `kind: "modal"` to open a form (up to 5 text inputs) and reply on submit; `kind: "reply"` (the default) keeps the existing click-to-reply behavior.
+- `DiscordClient.interactionCallback` for type-4 and type-9 interaction callbacks, with interaction-token redaction on errors.
+### Changed
+- `resolveInteraction` now reads the interaction type and returns either a channel-message or modal callback.
+- `Action` is a discriminated union; legacy registry entries without a `kind` load as replies.
+
 ## [0.6.0] - 2026-08-16
 ### Added
 - Invites: `list_guild_invites`, `list_channel_invites`, `get_invite`, `get_vanity_url`, `create_invite`, and `delete_invite` (consent-gated), with invite code and URL normalization.

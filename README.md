@@ -34,7 +34,7 @@ and registering it.
 - **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
 - **Messaging**: read, send, edit, and delete messages.
 - **Embeds**: build rich embeds with Discord's limits enforced.
-- **Components**: send messages with buttons and select menus (send-only for now).
+- **Components**: send messages with buttons and select menus.
 - **Channels**: full control: text/voice/forum settings, threads, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Webhooks**: create, manage, and execute webhooks.
@@ -42,7 +42,8 @@ and registering it.
 - **Invites**: list, create, inspect, and delete guild and channel invites.
 - **Emojis**: create, list, modify, and delete custom emojis.
 - **Stickers**: create, list, modify, and delete guild stickers, plus sticker packs.
-- **Actions**: register replies for button and select interactions.
+- **Actions**: register replies and modals for component interactions.
+- **Gateway**: `crow gateway` daemon receives interactions live and dispatches registered actions.
 - **Moderation**: kick and ban behind an explicit consent gate; list and unban.
 - **Raw REST**: a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
@@ -109,6 +110,7 @@ Crow ships a single `crow` command:
 | `crow` / `crow serve` | Run the MCP server over stdio. |
 | `crow setup` | Interactive setup wizard (token → user ID → intent check → save). |
 | `crow doctor` | Check the bot token and privileged intents. |
+| `crow gateway` | Run the always-on interaction gateway daemon. |
 | `crow --version` | Print the version. |
 | `crow --help` | Show help. |
 

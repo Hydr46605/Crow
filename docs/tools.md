@@ -24,6 +24,7 @@ Shared building blocks live alongside the tools:
 - `channel-types.ts`: channel type codes and friendly names.
 - `files.ts`: file-source resolution (path/url/data) with size limits and content-type inference.
 - `actions/`: the action registry plus the pure `resolveInteraction` hook.
+- `gateway/`: the Gateway connection (heartbeat, resume, reconnect) and the interaction daemon.
 
 ## Selection pipeline
 
@@ -44,9 +45,9 @@ can check limits before sending.
 local path, a URL, or inline base64/data-URI data.
 
 Components (buttons, string/user/role/mentionable/channel select menus) can be attached to messages.
-Crow does not yet connect to the Gateway to receive the resulting interactions live, but the actions
-runtime registers replies for `custom_id` values now, and its `resolveInteraction` hook is the
-extension point for the future Gateway transport.
+Run `crow gateway` to connect to the Gateway and receive the resulting interactions live: the actions
+runtime maps a component's `custom_id` to a reply or a modal, and Crow answers with the matching
+callback. Modal actions open a form (up to 5 text inputs) and reply when it is submitted.
 
 ## Consent model
 
@@ -151,7 +152,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 ### Actions
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
-| `register_action` | `customId`, `content?`, `embeds?`, `ephemeral?` | Register or replace the reply for a component custom_id. |
+| `register_action` | `kind?` (`reply` default, or `modal`), `customId`, `content?`, `embeds?`, `ephemeral?`, plus `title`, `inputs`, `submitCustomId` for modals | Register or replace a reply or modal action. |
 | `list_actions` | | List registered actions. |
 | `remove_action` | `customId` | Remove a registered action. |
 
@@ -183,4 +184,4 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `invites` | done | Manage invites and vanity URLs. |
 | `emojis` | done | Manage custom emojis. |
 | `stickers` | done | Manage guild stickers and packs. |
-| `interactions` | foundation | Action registry + hook; Gateway transport planned. |
+| `interactions` | done | Action registry, modal actions, and the Gateway transport. |
