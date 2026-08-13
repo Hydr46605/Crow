@@ -221,3 +221,37 @@ describe('editMessage with embeds', () => {
     });
   });
 });
+
+describe('sendMessage with attachments', () => {
+  it('resolves attachments into files and body.attachments', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawMessage;
+    });
+
+    await sendMessage(
+      {
+        channelId: '123456789012345678',
+        attachments: [{ name: 'a.png', data: 'aGVsbG8=', description: 'alt' }],
+      },
+      createContext(discord),
+    );
+
+    expect(captured?.o.body).toEqual({
+      attachments: [{ id: 0, filename: 'a.png', description: 'alt' }],
+    });
+    expect(captured?.o.files).toEqual([
+      { name: 'a.png', data: Buffer.from('hello'), contentType: 'image/png' },
+    ]);
+  });
+
+  it('accepts an attachment-only message', async () => {
+    const discord = new DiscordClient('token', async () => rawMessage);
+    const result = await sendMessage(
+      { channelId: '123456789012345678', attachments: [{ data: 'aGk=' }] },
+      createContext(discord),
+    );
+    expect(result.isError).toBeUndefined();
+  });
+});
