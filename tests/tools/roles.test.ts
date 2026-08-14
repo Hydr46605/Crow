@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
-import { createRole, deleteRole, listRoles, modifyRole, summarizeRole } from '../../src/tools/roles.js';
+import {
+  createRole,
+  deleteRole,
+  listRoles,
+  modifyRole,
+  modifyRoleInput,
+  summarizeRole,
+} from '../../src/tools/roles.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
 const rawRole = {
@@ -84,6 +91,16 @@ describe('modifyRole', () => {
     expect(captured?.m).toBe('PATCH');
     expect(captured?.r).toBe('/guilds/g/roles/9');
     expect(captured?.o.body).toEqual({ mentionable: true });
+  });
+});
+
+describe('modifyRoleInput', () => {
+  it('requires at least one modifier field', () => {
+    expect(modifyRoleInput.safeParse({ guildId: '123456789012345678', roleId: '123456789012345678' }).success).toBe(false);
+    expect(
+      modifyRoleInput.safeParse({ guildId: '123456789012345678', roleId: '123456789012345678', name: 'x' })
+        .success,
+    ).toBe(true);
   });
 });
 

@@ -33,23 +33,36 @@ const createRoleInput = {
   reason: z.string().max(512).optional().describe('Audit-log reason.'),
 };
 
-const modifyRoleInput = {
-  guildId: snowflake.describe('The ID of the guild the role belongs to.'),
-  roleId: snowflake.describe('The ID of the role to modify.'),
-  name: z.string().min(1).max(100).optional().describe('New role name.'),
-  permissions: rolePermissions,
-  color: roleColorSchema.optional(),
-  hoist: z.boolean().optional().describe('Whether members with this role are displayed separately.'),
-  mentionable: z.boolean().optional().describe('Whether anyone can mention this role.'),
-  unicodeEmoji: z
-    .string()
-    .min(1)
-    .max(64)
-    .nullable()
-    .optional()
-    .describe('Unicode emoji role icon, or null to remove it.'),
-  reason: z.string().max(512).optional().describe('Audit-log reason.'),
-};
+export const modifyRoleInput = z
+  .object({
+    guildId: snowflake.describe('The ID of the guild the role belongs to.'),
+    roleId: snowflake.describe('The ID of the role to modify.'),
+    name: z.string().min(1).max(100).optional().describe('New role name.'),
+    permissions: rolePermissions,
+    color: roleColorSchema.optional(),
+    hoist: z.boolean().optional().describe('Whether members with this role are displayed separately.'),
+    mentionable: z.boolean().optional().describe('Whether anyone can mention this role.'),
+    unicodeEmoji: z
+      .string()
+      .min(1)
+      .max(64)
+      .nullable()
+      .optional()
+      .describe('Unicode emoji role icon, or null to remove it.'),
+    reason: z.string().max(512).optional().describe('Audit-log reason.'),
+  })
+  .superRefine((args, ctx) => {
+    if (
+      args.name === undefined &&
+      args.permissions === undefined &&
+      args.color === undefined &&
+      args.hoist === undefined &&
+      args.mentionable === undefined &&
+      args.unicodeEmoji === undefined
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide at least one field to modify.' });
+    }
+  });
 
 const deleteRoleInput = {
   guildId: snowflake.describe('The ID of the guild the role belongs to.'),

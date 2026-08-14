@@ -29,24 +29,36 @@ const getMemberInput = {
   userId: snowflake.describe('The ID of the user to fetch.'),
 };
 
-const modifyMemberInput = {
-  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
-  userId: snowflake.describe('The ID of the member to modify.'),
-  nick: z.string().min(1).max(32).nullable().optional().describe('New nickname, or null to reset it.'),
-  mute: z.boolean().optional().describe('Whether the member is server-muted in voice channels.'),
-  deaf: z.boolean().optional().describe('Whether the member is server-deafened in voice channels.'),
-  channelId: snowflake
-    .nullable()
-    .optional()
-    .describe('Voice channel to move the member to, or null to disconnect them.'),
-  timeoutUntil: z
-    .string()
-    .datetime({ offset: true })
-    .nullable()
-    .optional()
-    .describe('ISO-8601 timestamp until which the member is timed out, or null to lift the timeout.'),
-  reason: z.string().max(512).optional().describe('Audit-log reason.'),
-};
+export const modifyMemberInput = z
+  .object({
+    guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+    userId: snowflake.describe('The ID of the member to modify.'),
+    nick: z.string().min(1).max(32).nullable().optional().describe('New nickname, or null to reset it.'),
+    mute: z.boolean().optional().describe('Whether the member is server-muted in voice channels.'),
+    deaf: z.boolean().optional().describe('Whether the member is server-deafened in voice channels.'),
+    channelId: snowflake
+      .nullable()
+      .optional()
+      .describe('Voice channel to move the member to, or null to disconnect them.'),
+    timeoutUntil: z
+      .string()
+      .datetime({ offset: true })
+      .nullable()
+      .optional()
+      .describe('ISO-8601 timestamp until which the member is timed out, or null to lift the timeout.'),
+    reason: z.string().max(512).optional().describe('Audit-log reason.'),
+  })
+  .superRefine((args, ctx) => {
+    if (
+      args.nick === undefined &&
+      args.mute === undefined &&
+      args.deaf === undefined &&
+      args.channelId === undefined &&
+      args.timeoutUntil === undefined
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide at least one field to modify.' });
+    }
+  });
 
 const addRoleToMemberInput = {
   guildId: snowflake.describe('The ID of the guild the member belongs to.'),

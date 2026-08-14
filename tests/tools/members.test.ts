@@ -5,6 +5,7 @@ import {
   getMember,
   listMembers,
   modifyMember,
+  modifyMemberInput,
   removeRoleFromMember,
   summarizeMember,
 } from '../../src/tools/members.js';
@@ -67,6 +68,16 @@ describe('getMember', () => {
     );
 
     expect(captured?.route).toBe('/guilds/123456789012345678/members/555');
+  });
+});
+
+describe('modifyMemberInput', () => {
+  it('requires at least one modifier field', () => {
+    expect(modifyMemberInput.safeParse({ guildId: '123456789012345678', userId: '123456789012345678' }).success).toBe(false);
+    expect(
+      modifyMemberInput.safeParse({ guildId: '123456789012345678', userId: '123456789012345678', nick: 'n' })
+        .success,
+    ).toBe(true);
   });
 });
 
