@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0] - 2026-09-01
+### Added
+- Roles: `list_roles`, `create_role`, `modify_role`, and `delete_role` (consent-gated), with named permissions and hex/int color support.
+- Member management: `modify_member` (nickname, voice mute/deafen/move, timeout), `add_role_to_member`, and `remove_role_from_member`.
+- Reactions: `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, and `list_reactions` for unicode and custom `name:id` emojis.
+- Messages: `pin_message`, `unpin_message`, and `bulk_delete_messages` (consent-gated, 2-100 messages).
+- Audit: `list_audit_log_entries` for reading who changed what, filterable by user and action type.
+### Changed
+- `members.ts` and `messages.ts` now register the new member and message tools.
+- The consent and idempotent annotation lists now cover the new destructive and reversible writes.
+
 ## [0.7.0] - 2026-08-24
 ### Added
 - `crow gateway` daemon that connects to the Discord Gateway (native WebSocket), identifies with the `GUILDS` intent, and dispatches live interactions with heartbeat ack-tracking, resume, and exponential-backoff reconnect.

@@ -32,11 +32,15 @@ and registering it.
 ## Capabilities
 
 - **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
-- **Messaging**: read, send, edit, and delete messages.
+- **Messaging**: read, send, edit, delete, pin, and bulk-delete messages.
 - **Embeds**: build rich embeds with Discord's limits enforced.
 - **Components**: send messages with buttons and select menus.
 - **Channels**: full control: text/voice/forum settings, threads, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
+- **Roles**: create, modify, and delete roles; assign and remove them from members.
+- **Members**: edit nicknames, voice state, and timeouts.
+- **Reactions**: add, remove, and list message reactions.
+- **Audit**: read the guild audit log.
 - **Webhooks**: create, manage, and execute webhooks.
 - **Attachments**: send files, images, and GIFs alongside messages.
 - **Invites**: list, create, inspect, and delete guild and channel invites.
@@ -48,8 +52,8 @@ and registering it.
 - **Raw REST**: a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
 Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
-`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`) require an explicit
-`"confirm": true` consent flag.
+`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`,
+`bulk_delete_messages`) require an explicit `"confirm": true` consent flag.
 
 Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) plus human-readable titles and per-field descriptions, so clients can present and
@@ -61,10 +65,14 @@ permission the tools safely.
 | --- | --- |
 | Health | `ping` |
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
-| Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message` |
+| Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message`, `pin_message`, `unpin_message`, `bulk_delete_messages` |
 | Embeds | `create_embed` |
 | Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
 | Guild config | `modify_guild` |
+| Roles | `list_roles`, `create_role`, `modify_role`, `delete_role` |
+| Members | `modify_member`, `add_role_to_member`, `remove_role_from_member` |
+| Reactions | `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, `list_reactions` |
+| Audit | `list_audit_log_entries` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |
 | Invites | `list_guild_invites`, `list_channel_invites`, `get_invite`, `get_vanity_url`, `create_invite`, `delete_invite` |
 | Emojis | `list_emojis`, `get_emoji`, `create_emoji`, `modify_emoji`, `delete_emoji` |

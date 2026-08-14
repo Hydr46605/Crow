@@ -52,8 +52,9 @@ callback. Modal actions open a form (up to 5 text inputs) and reply when it is s
 ## Consent model
 
 Destructive tools require an explicit `"confirm": true` argument. Without it they return an error
-and take no action. This applies to `kick_member`, `ban_member`, `delete_channel`,
-`delete_message`, `delete_webhook`, `delete_invite`, `delete_emoji`, and `delete_sticker`.
+and take no action. This applies to `kick_member`, `ban_member`, `delete_channel`, `delete_message`,
+`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`, and
+`bulk_delete_messages`.
 
 ## Annotations
 
@@ -62,9 +63,12 @@ Every tool carries MCP annotations so clients can reason about safety without re
 - Read-only tools (`list_*`, `get_*`, `read_messages`, `ping`, `create_embed`, `list_actions`)
   set `readOnlyHint`.
 - Destructive tools (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
-  `delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`) set `destructiveHint`.
+  `delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`,
+  `bulk_delete_messages`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
-  `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `unban_member`,
+  `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `modify_role`,
+  `modify_member`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
+  `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
   `register_action`, `remove_action`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
 
@@ -94,6 +98,9 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `send_message` | `channelId`, `content?`, `embeds?`, `components?`, `attachments?`, `allowedMentions?`, `tts?`, `replyTo?` | Send a channel message. |
 | `edit_message` | `channelId`, `messageId`, `content?`, `embeds?`, `components?`, `attachments?` | Edit a message. |
 | `delete_message` | `channelId`, `messageId`, `confirm` | Delete a message (consent-gated). |
+| `pin_message` | `channelId`, `messageId` | Pin a message in a channel. |
+| `unpin_message` | `channelId`, `messageId` | Unpin a message in a channel. |
+| `bulk_delete_messages` | `channelId`, `messageIds`, `confirm` | Delete up to 100 messages at once (consent-gated). |
 | `create_embed` | `embed` | Validate an embed and return its Discord JSON. |
 
 ### Channels & threads
@@ -149,6 +156,34 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `modify_sticker` | `guildId`, `stickerId`, `name?`, `description?`, `tags?`, `reason?` | Modify a sticker. |
 | `delete_sticker` | `guildId`, `stickerId`, `confirm`, `reason?` | Delete a sticker (consent-gated). |
 
+### Roles
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_roles` | `guildId` | List a guild's roles with permissions and settings. |
+| `create_role` | `guildId`, `name?`, `permissions?`, `color?`, `hoist?`, `mentionable?`, `unicodeEmoji?`, `reason?` | Create a role. |
+| `modify_role` | `guildId`, `roleId`, `name?`, `permissions?`, `color?`, `hoist?`, `mentionable?`, `unicodeEmoji?`, `reason?` | Modify a role. |
+| `delete_role` | `guildId`, `roleId`, `confirm`, `reason?` | Delete a role (consent-gated). |
+
+### Member management
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `modify_member` | `guildId`, `userId`, `nick?`, `mute?`, `deaf?`, `channelId?`, `timeoutUntil?`, `reason?` | Modify a member (nickname, voice, timeout). |
+| `add_role_to_member` | `guildId`, `userId`, `roleId` | Assign a role to a member. |
+| `remove_role_from_member` | `guildId`, `userId`, `roleId` | Remove a role from a member. |
+
+### Reactions
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `add_reaction` | `channelId`, `messageId`, `emoji` | React to a message as the bot. |
+| `remove_own_reaction` | `channelId`, `messageId`, `emoji` | Remove the bot's own reaction. |
+| `remove_user_reaction` | `channelId`, `messageId`, `emoji`, `userId` | Remove another user's reaction. |
+| `list_reactions` | `channelId`, `messageId`, `emoji`, `limit?`, `after?` | List the users who reacted with an emoji. |
+
+### Audit
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_audit_log_entries` | `guildId`, `userId?`, `actionType?`, `before?`, `limit?` | Read the guild audit log. |
+
 ### Actions
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
@@ -185,3 +220,6 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `emojis` | done | Manage custom emojis. |
 | `stickers` | done | Manage guild stickers and packs. |
 | `interactions` | done | Action registry, modal actions, and the Gateway transport. |
+| `roles` | done | Manage roles and member role assignment. |
+| `reactions` | done | Add and remove message reactions. |
+| `audit` | done | Read the guild audit log. |
