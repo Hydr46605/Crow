@@ -1,5 +1,6 @@
 import { REST } from 'discord.js';
 import { redactSecrets } from '../security/redact.js';
+import { fetchWithRetry } from './retry.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -120,7 +121,7 @@ const INTERACTION_BASE = 'https://discord.com/api/interactions';
 const createInteractionCallbackExecutor = (): InteractionCallbackExecutor => {
   return async (interactionId, interactionToken, callback) => {
     const url = `${INTERACTION_BASE}/${interactionId}/${interactionToken}/callback`;
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(callback),
@@ -148,7 +149,7 @@ const createWebhookExecutor = (): WebhookExecutor => {
       }
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
