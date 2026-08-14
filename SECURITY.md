@@ -9,19 +9,25 @@ Please report security issues privately rather than opening a public issue. Open
 advisory on the [Security](https://github.com/Hydr46605/Crow/security) tab, or contact the
 maintainer directly.
 
-## Keeping your token safe
+## Keeping secrets safe
 
 - Never commit `.env` or a real token. `.env` is git-ignored; only `.env.example` is tracked.
-- `CROW_BOT_TOKEN` is loaded into memory only, validated to reject whitespace, and never logged;
+- The bot token is loaded into memory only, validated to reject whitespace, and never logged;
   error messages are scrubbed with `[REDACTED]` before being returned or printed.
-- The `discord_request` tool can reach any endpoint the bot can; the token stays server-side and is
-  never exposed to the caller.
+- Webhook tokens and interaction tokens are also redacted from any error Crow surfaces.
+- Credentials and the action registry are stored owner-readable (`0600`) under `~/.crow`.
+- File downloads for attachments, stickers, and emoji accept `http(s)` URLs only and are capped to
+  their size limit while streaming, so a malicious URL cannot exhaust memory.
 
 ## Destructive actions
 
-`kick_member`, `ban_member`, `delete_channel`, and `delete_message` are destructive and require an
-explicit `"confirm": true` consent flag. Without consent they return an error and perform no action.
+The following tools are destructive and require an explicit `"confirm": true` consent flag.
+Without consent they return an error and perform no action:
+
+`kick_member`, `ban_member`, `delete_channel`, `delete_message`, `delete_webhook`,
+`delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`, and `bulk_delete_messages`.
 
 ## Least privilege
 
-Grant the bot only the permissions its tasks actually require.
+Grant the bot only the permissions its tasks actually require. Prefer read-only tools, and check
+each tool's annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) before acting.

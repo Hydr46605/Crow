@@ -15,6 +15,7 @@ moderation, and arbitrary REST calls, through a small set of typed, consent-awar
 
 - [Getting Started](./docs/getting-started.md)
 - [Tools](./docs/tools.md)
+- [Gateway](./docs/gateway.md)
 - [Build And Release](./docs/build-and-release.md)
 - [GitHub Releases](https://github.com/Hydr46605/Crow/releases)
 

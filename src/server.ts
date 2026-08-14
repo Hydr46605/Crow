@@ -12,9 +12,19 @@ export interface CreateServerOptions {
   readonly actions: ActionRuntime;
 }
 
+const INSTRUCTIONS = [
+  'Crow is a Discord toolkit for AI agents. Most actions are per-guild: use list_guilds',
+  'to pick a guild, then list_channels/list_members to find targets, then act.',
+  'Destructive tools (kick, ban, delete_*, bulk_delete_messages) require an explicit',
+  '"confirm": true argument and refuse otherwise. Check tool annotations',
+  '(readOnlyHint, destructiveHint, idempotentHint) before acting, and prefer typed tools',
+  'over discord_request. Registered component actions are dispatched live by the',
+  'crow gateway daemon.',
+].join(' ');
+
 /** Builds a fully-wired MCP server with all tools registered. */
 export const createServer = ({ config, discord, actions }: CreateServerOptions): McpServer => {
-  const server = new McpServer({ name: NAME, version: VERSION });
+  const server = new McpServer({ name: NAME, version: VERSION }, { instructions: INSTRUCTIONS });
 
   const ctx: CrowContext = { config, discord, actions };
   registerTools(server, ctx);

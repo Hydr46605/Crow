@@ -56,6 +56,7 @@ set the `CROW_HOME` environment variable.
 | `crow` / `crow serve` | Run the MCP server over stdio. |
 | `crow setup` | Interactive setup wizard. |
 | `crow doctor` | Check the bot token and privileged intents (exits non-zero if unhealthy). |
+| `crow gateway` | Run the always-on interaction gateway daemon (see [Gateway](./gateway.md)). |
 | `crow --version` | Print the version. |
 | `crow --help` | Show help. |
 
