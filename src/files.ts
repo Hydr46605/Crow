@@ -11,7 +11,12 @@ export const fileSourceShape = z.object({
     .optional()
     .describe('File name to use (defaults to the source name).'),
   path: z.string().min(1).optional().describe('Local file path to read the file from.'),
-  url: z.string().url().optional().describe('URL to download the file from.'),
+  url: z
+    .string()
+    .url()
+    .refine((value) => /^https?:\/\//i.test(value), 'URL must use http or https.')
+    .optional()
+    .describe('HTTP(S) URL to download the file from.'),
   data: z
     .string()
     .min(1)
@@ -86,6 +91,36 @@ const assertSize = (bytes: number, maxBytes: number): void => {
   }
 };
 
+/** Reads a response body into a Buffer, aborting early if it exceeds `maxBytes`. */
+const readBodyCapped = async (response: Response, maxBytes: number): Promise<Buffer> => {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength !== null) {
+    const size = Number(contentLength);
+    if (!Number.isNaN(size)) assertSize(size, maxBytes);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const data = Buffer.from(await response.arrayBuffer());
+    assertSize(data.byteLength, maxBytes);
+    return data;
+  }
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`File exceeds the ${maxBytes} byte limit.`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+};
+
 /** Decodes a data URI (or bare base64) into bytes and a content type. */
 export const decodeData = (input: string): { data: Buffer; contentType: string } => {
   const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(input);
@@ -113,8 +148,7 @@ export const resolveFile = async (source: FileSourceInput, maxBytes: number): Pr
     if (!response.ok) {
       throw new Error(`Download failed with status ${response.status}.`);
     }
-    const data = Buffer.from(await response.arrayBuffer());
-    assertSize(data.byteLength, maxBytes);
+    const data = await readBodyCapped(response, maxBytes);
     const name = source.name ?? basename(new URL(source.url).pathname);
     const headerType = response.headers.get('content-type');
     return {

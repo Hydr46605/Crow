@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   decodeData,
   fileSourceSchema,
@@ -43,6 +43,31 @@ describe('fileSourceSchema', () => {
     expect(fileSourceSchema.safeParse({}).success).toBe(false);
     expect(fileSourceSchema.safeParse({ path: 'a', url: 'https://b' }).success).toBe(false);
     expect(fileSourceSchema.safeParse({ data: 'aGVsbG8=' }).success).toBe(true);
+  });
+
+  it('rejects non-http(s) URLs', () => {
+    expect(fileSourceSchema.safeParse({ url: 'ftp://example.com/file.png' }).success).toBe(false);
+    expect(fileSourceSchema.safeParse({ url: 'http://example.com/file.png' }).success).toBe(true);
+    expect(fileSourceSchema.safeParse({ url: 'https://example.com/file.png' }).success).toBe(true);
+  });
+});
+
+describe('resolveFile download cap', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('rejects a download whose content-length exceeds the limit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => (name === 'content-length' ? '999999999' : null) },
+      })),
+    );
+
+    await expect(
+      resolveFile({ url: 'https://example.com/big.png' }, MAX_ATTACHMENT_BYTES),
+    ).rejects.toThrow('exceeding');
   });
 });
 
