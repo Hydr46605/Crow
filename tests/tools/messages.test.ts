@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
 import {
+  bulkDeleteMessages,
   deleteMessage,
   editMessage,
+  pinMessage,
   readMessages,
   sendMessage,
   summarizeMessage,
+  unpinMessage,
 } from '../../src/tools/messages.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
@@ -253,5 +256,68 @@ describe('sendMessage with attachments', () => {
       createContext(discord),
     );
     expect(result.isError).toBeUndefined();
+  });
+});
+
+describe('pinMessage', () => {
+  it('puts the pin route', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return null;
+    });
+
+    const result = await pinMessage({ channelId: 'c', messageId: 'm' }, createContext(discord));
+
+    expect(captured?.m).toBe('PUT');
+    expect(captured?.r).toBe('/channels/c/pins/m');
+    expect(textOf(result)).toContain('Pinned');
+  });
+});
+
+describe('unpinMessage', () => {
+  it('deletes the pin route', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return null;
+    });
+
+    await unpinMessage({ channelId: 'c', messageId: 'm' }, createContext(discord));
+
+    expect(captured?.m).toBe('DELETE');
+    expect(captured?.r).toBe('/channels/c/pins/m');
+  });
+});
+
+describe('bulkDeleteMessages', () => {
+  it('requires consent', async () => {
+    const discord = new DiscordClient('token', async () => {
+      throw new Error('should not run');
+    });
+    const result = await bulkDeleteMessages(
+      { channelId: 'c', messageIds: ['1', '2'] },
+      createContext(discord),
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('consent');
+  });
+
+  it('posts the bulk-delete body with consent', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return null;
+    });
+
+    const result = await bulkDeleteMessages(
+      { channelId: 'c', messageIds: ['1', '2'], confirm: true },
+      createContext(discord),
+    );
+
+    expect(captured?.m).toBe('POST');
+    expect(captured?.r).toBe('/channels/c/messages/bulk-delete');
+    expect(captured?.o.body).toEqual({ messages: ['1', '2'] });
+    expect(textOf(result)).toContain('Deleted 2 messages');
   });
 });

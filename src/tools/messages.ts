@@ -92,6 +92,26 @@ const deleteMessageInput = {
   confirm: consent,
 };
 
+const pinMessageInput = {
+  channelId: snowflake.describe('The ID of the channel containing the message.'),
+  messageId: snowflake.describe('The ID of the message to pin.'),
+};
+
+const unpinMessageInput = {
+  channelId: snowflake.describe('The ID of the channel containing the message.'),
+  messageId: snowflake.describe('The ID of the message to unpin.'),
+};
+
+const bulkDeleteMessagesInput = {
+  channelId: snowflake.describe('The ID of the channel to bulk-delete messages in.'),
+  messageIds: z
+    .array(snowflake)
+    .min(2)
+    .max(100)
+    .describe('2-100 message IDs to delete (all must be under 14 days old).'),
+  confirm: consent,
+};
+
 export interface ReadMessagesArgs {
   readonly channelId: string;
   readonly limit?: number;
@@ -106,6 +126,17 @@ export type EditMessageArgs = z.infer<typeof editMessageInput>;
 export interface DeleteMessageArgs {
   readonly channelId: string;
   readonly messageId: string;
+  readonly confirm?: true;
+}
+
+export interface PinMessageArgs {
+  readonly channelId: string;
+  readonly messageId: string;
+}
+
+export interface BulkDeleteMessagesArgs {
+  readonly channelId: string;
+  readonly messageIds: readonly string[];
   readonly confirm?: true;
 }
 
@@ -239,6 +270,44 @@ export const deleteMessage = async (
   return textResult(`Deleted message ${args.messageId}.`);
 };
 
+export const pinMessage = async (
+  args: PinMessageArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('pin_message', () =>
+    ctx.discord.request<unknown>('PUT', `/channels/${args.channelId}/pins/${args.messageId}`),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Pinned message ${args.messageId}.`);
+};
+
+export const unpinMessage = async (
+  args: PinMessageArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('unpin_message', () =>
+    ctx.discord.request<unknown>('DELETE', `/channels/${args.channelId}/pins/${args.messageId}`),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Unpinned message ${args.messageId}.`);
+};
+
+export const bulkDeleteMessages = async (
+  args: BulkDeleteMessagesArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const gate = requireConsent(args.confirm);
+  if (gate) return gate;
+
+  const result = await attempt('bulk_delete_messages', () =>
+    ctx.discord.request<unknown>('POST', `/channels/${args.channelId}/messages/bulk-delete`, {
+      body: { messages: args.messageIds },
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Deleted ${args.messageIds.length} messages.`);
+};
+
 export const registerMessageTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'read_messages',
@@ -281,5 +350,36 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
       annotations: DESTRUCTIVE,
     },
     async (args) => deleteMessage(args, ctx),
+  );
+  server.registerTool(
+    'pin_message',
+    {
+      title: 'Pin message',
+      description: 'Pin a message in a channel.',
+      inputSchema: pinMessageInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => pinMessage(args, ctx),
+  );
+  server.registerTool(
+    'unpin_message',
+    {
+      title: 'Unpin message',
+      description: 'Unpin a message in a channel.',
+      inputSchema: unpinMessageInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => unpinMessage(args, ctx),
+  );
+  server.registerTool(
+    'bulk_delete_messages',
+    {
+      title: 'Bulk delete messages',
+      description:
+        'Delete up to 100 messages at once (all under 14 days old). Requires explicit consent ("confirm": true).',
+      inputSchema: bulkDeleteMessagesInput,
+      annotations: DESTRUCTIVE,
+    },
+    async (args) => bulkDeleteMessages(args, ctx),
   );
 };
