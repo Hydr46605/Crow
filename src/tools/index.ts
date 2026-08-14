@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CrowContext } from '../context.js';
 import { registerActionTools } from './actions.js';
+import { registerAuditLogTools } from './audit-log.js';
 import { registerChannelTools } from './channels.js';
 import { registerEmbedTools } from './embeds.js';
 import { registerEmojiTools } from './emojis.js';
@@ -11,6 +12,8 @@ import { registerMessageTools } from './messages.js';
 import { registerModerationTools } from './moderation.js';
 import { registerPingTool } from './ping.js';
 import { registerRawTool } from './raw.js';
+import { registerReactionTools } from './reactions.js';
+import { registerRoleTools } from './roles.js';
 import { registerStickerTools } from './stickers.js';
 import { registerWebhookTools } from './webhooks.js';
 
@@ -27,6 +30,9 @@ const registrars: readonly ToolRegistrar[] = [
   registerMemberTools,
   registerMessageTools,
   registerChannelTools,
+  registerRoleTools,
+  registerReactionTools,
+  registerAuditLogTools,
   registerModerationTools,
   registerEmbedTools,
   registerWebhookTools,
