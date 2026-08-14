@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.0] - 2026-09-08
+### Security
+- File downloads now accept `http(s)` URLs only and are capped to their size limit while streaming (no unbounded or non-HTTP fetches).
+- `SECURITY.md` now lists every consent-gated destructive tool and the secret-redaction guarantees.
+### Changed
+- Webhook execution and interaction callbacks retry transient failures (408, 429, 5xx) with exponential backoff.
+- The gateway daemon logs state transitions, handles unhandled rejections, and exits cleanly on a fatal exception so a supervisor can restart it.
+- `modify_member` and `modify_role` reject empty updates instead of sending a no-op request to Discord.
+- The MCP server now advertises `instructions` describing the per-guild flow and consent model.
+- Added `docs/gateway.md` with a systemd example for running `crow gateway` persistently.
+
 ## [0.8.0] - 2026-09-01
 ### Added
 - Roles: `list_roles`, `create_role`, `modify_role`, and `delete_role` (consent-gated), with named permissions and hex/int color support.
