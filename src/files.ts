@@ -59,6 +59,9 @@ export const MAX_STICKER_BYTES = 512 * 1024;
 /** Discord custom emoji image limit. */
 export const MAX_EMOJI_BYTES = 256 * 1024;
 
+/** Discord bot avatar and banner image limit. */
+export const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.png': 'image/png',
   '.apng': 'image/png',

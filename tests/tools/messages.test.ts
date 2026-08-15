@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
 import {
+  buildMessageBody,
   bulkDeleteMessages,
   deleteMessage,
   editMessage,
@@ -30,6 +31,23 @@ describe('summarizeMessage', () => {
       content: 'hello',
       createdAt: '2026-08-16T00:00:00.000Z',
     });
+  });
+});
+
+describe('buildMessageBody', () => {
+  it('builds the body and resolves attachments from the shared fields', async () => {
+    const { body, files } = await buildMessageBody({
+      content: 'hi',
+      embeds: [{ title: 'T' }],
+      attachments: [{ name: 'a.txt', data: 'aGVsbG8=' }],
+    });
+
+    expect(body).toEqual({
+      content: 'hi',
+      embeds: [{ title: 'T' }],
+      attachments: [{ id: 0, filename: 'a.txt', description: undefined }],
+    });
+    expect(files).toEqual([{ name: 'a.txt', data: Buffer.from('hello'), contentType: 'text/plain' }]);
   });
 });
 

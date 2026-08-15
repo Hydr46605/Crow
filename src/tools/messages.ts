@@ -6,11 +6,11 @@ import type { DiscordFile } from '../discord/client.js';
 import { fileSourceShape, MAX_ATTACHMENT_BYTES, requireSingleFileSource, resolveFile } from '../files.js';
 import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
-import { componentsSchema, normalizeComponents } from './components.js';
+import { componentsSchema, normalizeComponents, type ComponentsInput } from './components.js';
 import { requireConsent } from './consent.js';
-import { embedsSchema, normalizeEmbeds } from './embeds.js';
+import { embedsSchema, normalizeEmbeds, type EmbedInput } from './embeds.js';
 import { errorResult, textResult } from './result.js';
-import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake } from './schemas.js';
+import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake, type AllowedMentionsInput } from './schemas.js';
 
 const attachmentSchema = fileSourceShape
   .extend({
@@ -18,7 +18,7 @@ const attachmentSchema = fileSourceShape
   })
   .superRefine(requireSingleFileSource);
 
-const attachmentsSchema = z
+export const attachmentsSchema = z
   .array(attachmentSchema)
   .min(1)
   .max(10)
@@ -140,7 +140,7 @@ export interface BulkDeleteMessagesArgs {
   readonly confirm?: true;
 }
 
-interface RawMessage {
+export interface RawMessage {
   readonly id: string;
   readonly channel_id: string;
   readonly author: { readonly id: string; readonly username: string };
@@ -187,6 +187,47 @@ const attachmentsBody = (
     description: attachment.description,
   }));
 
+/** A message attachment, resolved to bytes and referenced by index in the body. */
+export interface MessageAttachmentInput {
+  readonly name?: string;
+  readonly path?: string;
+  readonly url?: string;
+  readonly data?: string;
+  readonly description?: string;
+}
+
+/** The shared message-content fields used by send_message, edit_message, and send_dm. */
+export interface BuildMessageBodyArgs {
+  readonly content?: string;
+  readonly embeds?: EmbedInput[];
+  readonly components?: ComponentsInput;
+  readonly attachments?: readonly MessageAttachmentInput[];
+  readonly allowedMentions?: AllowedMentionsInput;
+  readonly tts?: boolean;
+  readonly replyTo?: string;
+}
+
+/**
+ * Builds a Discord message body plus its multipart files from the shared
+ * message fields. Used by the messaging and DM tools so their payloads stay
+ * identical.
+ */
+export const buildMessageBody = async (
+  args: BuildMessageBodyArgs,
+): Promise<{ body: Record<string, unknown>; files: DiscordFile[] }> => {
+  const files = args.attachments ? await resolveAttachments(args.attachments) : [];
+
+  const body: Record<string, unknown> = {};
+  if (args.content !== undefined) body.content = args.content;
+  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+  if (args.components) body.components = normalizeComponents(args.components);
+  if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
+  if (args.tts !== undefined) body.tts = args.tts;
+  if (args.replyTo) body.message_reference = { message_id: args.replyTo };
+  if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+  return { body, files };
+};
+
 export const readMessages = async (
   args: ReadMessagesArgs,
   ctx: CrowContext,
@@ -210,16 +251,15 @@ export const sendMessage = async (
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
   const result = await attempt('send_message', async () => {
-    const files = args.attachments ? await resolveAttachments(args.attachments) : [];
-
-    const body: Record<string, unknown> = {};
-    if (args.content !== undefined) body.content = args.content;
-    if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-    if (args.components) body.components = normalizeComponents(args.components);
-    if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
-    if (args.tts !== undefined) body.tts = args.tts;
-    if (args.replyTo) body.message_reference = { message_id: args.replyTo };
-    if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+    const { body, files } = await buildMessageBody({
+      content: args.content,
+      embeds: args.embeds,
+      components: args.components,
+      attachments: args.attachments,
+      allowedMentions: args.allowedMentions,
+      tts: args.tts,
+      replyTo: args.replyTo,
+    });
 
     return ctx.discord.request<RawMessage>('POST', `/channels/${args.channelId}/messages`, {
       body,
@@ -235,13 +275,12 @@ export const editMessage = async (
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
   const result = await attempt('edit_message', async () => {
-    const files = args.attachments ? await resolveAttachments(args.attachments) : [];
-
-    const body: Record<string, unknown> = {};
-    if (args.content !== undefined) body.content = args.content;
-    if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-    if (args.components) body.components = normalizeComponents(args.components);
-    if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+    const { body, files } = await buildMessageBody({
+      content: args.content,
+      embeds: args.embeds,
+      components: args.components,
+      attachments: args.attachments,
+    });
 
     return ctx.discord.request<RawMessage>(
       'PATCH',
