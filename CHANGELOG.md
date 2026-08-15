@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0] - 2026-09-12
+### Added
+- Direct messages: `list_dm_channels` and `send_dm` (resolves the DM channel, then sends content, embeds, components, and/or attachments).
+- Bot self-profile: `get_current_user` and `modify_current_user` (username, avatar, banner, and bio; avatar/banner accept a data URI or file source).
+- Forum completion: `create_thread` now accepts the initial post content (`message`) and `appliedTags`, and `list_archived_threads` lists archived forum posts.
+### Changed
+- `send_message`, `edit_message`, and `send_dm` now share a single `buildMessageBody` helper so their payloads stay identical.
+
 ## [0.9.1] - 2026-09-09
 ### Fixed
 - Invite summaries now surface Discord's current invite fields (`inviteId`, `type`, `createdAt`, a top-level `guildId`, and the always-present `memberCount`/`onlineCount` from the community profile) instead of dropping them.

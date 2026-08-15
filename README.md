@@ -34,12 +34,14 @@ and registering it.
 
 - **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
 - **Messaging**: read, send, edit, delete, pin, and bulk-delete messages.
+- **Direct messages**: send DMs to users with content, embeds, components, and attachments.
 - **Embeds**: build rich embeds with Discord's limits enforced.
 - **Components**: send messages with buttons and select menus.
-- **Channels**: full control: text/voice/forum settings, threads, and permission overwrites.
+- **Channels**: full control: text/voice/forum settings, threads, forum posts, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Roles**: create, modify, and delete roles; assign and remove them from members.
 - **Members**: edit nicknames, voice state, and timeouts.
+- **Self**: read and modify the bot's own profile (username, avatar, banner, bio).
 - **Reactions**: add, remove, and list message reactions.
 - **Audit**: read the guild audit log.
 - **Webhooks**: create, manage, and execute webhooks.
@@ -67,11 +69,13 @@ permission the tools safely.
 | Health | `ping` |
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
 | Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message`, `pin_message`, `unpin_message`, `bulk_delete_messages` |
+| Direct messages | `list_dm_channels`, `send_dm` |
 | Embeds | `create_embed` |
-| Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
+| Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `list_archived_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
 | Guild config | `modify_guild` |
 | Roles | `list_roles`, `create_role`, `modify_role`, `delete_role` |
 | Members | `modify_member`, `add_role_to_member`, `remove_role_from_member` |
+| Self | `get_current_user`, `modify_current_user` |
 | Reactions | `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, `list_reactions` |
 | Audit | `list_audit_log_entries` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |

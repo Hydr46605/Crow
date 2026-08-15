@@ -1,6 +1,6 @@
 {
   "name": "crow",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "An MCP server exposing extensive Discord capabilities to AI agents.",
   "author": "Hydr46605 <https://github.com/Hydr46605>",
   "license": "MIT",

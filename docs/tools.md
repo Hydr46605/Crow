@@ -67,7 +67,7 @@ Every tool carries MCP annotations so clients can reason about safety without re
   `bulk_delete_messages`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
   `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `modify_role`,
-  `modify_member`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
+  `modify_member`, `modify_current_user`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
   `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
   `register_action`, `remove_action`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
@@ -103,6 +103,12 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `bulk_delete_messages` | `channelId`, `messageIds`, `confirm` | Delete up to 100 messages at once (consent-gated). |
 | `create_embed` | `embed` | Validate an embed and return its Discord JSON. |
 
+### Direct messages
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_dm_channels` | | List the bot's DM channels and their recipients. |
+| `send_dm` | `userId`, `content?`, `embeds?`, `components?`, `attachments?`, `allowedMentions?`, `tts?` | Send a DM to a user (creates the DM channel if needed). |
+
 ### Channels & threads
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
@@ -110,7 +116,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `create_channel` | `guildId`, `name`, `type?`, plus the voice/forum/overwrite fields above | Create a channel. |
 | `delete_channel` | `channelId`, `confirm` | Delete a channel (consent-gated). |
 | `list_active_threads` | `channelId` | List a channel's active threads. |
-| `create_thread` | `channelId`, `name`, `messageId?`, `type?`, `autoArchiveDuration?`, `rateLimitPerUser?` | Create a thread, or start one from a message. |
+| `list_archived_threads` | `channelId` | List a channel's archived public threads (forum posts). |
+| `create_thread` | `channelId`, `name`, `messageId?`, `type?`, `autoArchiveDuration?`, `rateLimitPerUser?`, `message?`, `appliedTags?` | Create a thread, start one from a message, or create a forum post. |
 | `modify_thread` | `threadId`, `name?`, `archived?`, `locked?`, `autoArchiveDuration?`, `rateLimitPerUser?`, `appliedTags?` | Modify a thread. |
 | `edit_channel_permissions` | `channelId`, `overwriteId`, `type`, `allow?`, `deny?` | Set a role/member permission overwrite (named permissions). |
 | `delete_channel_permissions` | `channelId`, `overwriteId` | Remove a role/member permission overwrite. |
@@ -171,6 +178,12 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `add_role_to_member` | `guildId`, `userId`, `roleId` | Assign a role to a member. |
 | `remove_role_from_member` | `guildId`, `userId`, `roleId` | Remove a role from a member. |
 
+### Self
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `get_current_user` | | Get the bot's own profile (username, avatar, banner, bio). |
+| `modify_current_user` | `username?`, `avatar?`, `banner?`, `bio?` | Modify the bot's own profile (avatar/banner accept a data URI or file source). |
+
 ### Reactions
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
@@ -223,3 +236,5 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `roles` | done | Manage roles and member role assignment. |
 | `reactions` | done | Add and remove message reactions. |
 | `audit` | done | Read the guild audit log. |
+| `dms` | done | Send direct messages to users. |
+| `self` | done | Read and modify the bot's own profile. |
