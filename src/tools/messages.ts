@@ -228,20 +228,40 @@ export const buildMessageBody = async (
   return { body, files };
 };
 
+export interface FetchMessagesQuery {
+  readonly limit?: number;
+  readonly before?: string;
+  readonly after?: string;
+  readonly around?: string;
+}
+
+/** Fetches raw messages from a channel, shared by read_messages and read_dm_messages. */
+export const fetchMessages = (
+  channelId: string,
+  query: FetchMessagesQuery,
+  ctx: CrowContext,
+): Promise<RawMessage[]> => {
+  const params: Record<string, string | number | boolean | undefined> = {
+    limit: query.limit,
+    before: query.before,
+    after: query.after,
+    around: query.around,
+  };
+  return ctx.discord.request<RawMessage[]>('GET', `/channels/${channelId}/messages`, { query: params });
+};
+
 export const readMessages = async (
   args: ReadMessagesArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const query = {
+  const query: FetchMessagesQuery = {
     limit: args.limit,
     before: args.before,
     after: args.after,
     around: args.around,
   };
 
-  const result = await attempt('read_messages', () =>
-    ctx.discord.request<RawMessage[]>('GET', `/channels/${args.channelId}/messages`, { query }),
-  );
+  const result = await attempt('read_messages', () => fetchMessages(args.channelId, query, ctx));
   if (!result.ok) return errorResult(result.error);
   return textResult(JSON.stringify(result.value.map(summarizeMessage), null, 2));
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
-import { listDmChannels, sendDm, summarizeDmChannel } from '../../src/tools/dms.js';
+import { getDmChannel, listDmChannels, readDmMessages, sendDm, summarizeDmChannel } from '../../src/tools/dms.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
 describe('summarizeDmChannel', () => {
@@ -82,5 +82,51 @@ describe('sendDm', () => {
 
     expect(captured?.r).toBe('/channels/dm1/messages');
     expect(captured?.o.body).toMatchObject({ embeds: [{ title: 'T' }] });
+  });
+});
+
+describe('getDmChannel', () => {
+  it('resolves the DM channel for a user', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return { id: 'dm1', type: 1, recipients: [{ id: 'u1', username: 'alice' }] };
+    });
+
+    const result = await getDmChannel({ userId: 'u1' }, createContext(discord));
+
+    expect(captured?.r).toBe('/users/@me/channels');
+    expect(captured?.o.body).toEqual({ recipient_id: 'u1' });
+    expect(textOf(result)).toContain('"id": "dm1"');
+  });
+});
+
+describe('readDmMessages', () => {
+  it('resolves by user then reads the messages', async () => {
+    const routes: string[] = [];
+    const discord = new DiscordClient('token', async (m, r) => {
+      routes.push(r);
+      if (r === '/users/@me/channels') return { id: 'dm1', type: 1 };
+      return [
+        { id: 'm1', channel_id: 'dm1', author: { id: 'u1', username: 'alice' }, content: 'hi', timestamp: 't' },
+      ];
+    });
+
+    const result = await readDmMessages({ userId: 'u1', limit: 10 }, createContext(discord));
+
+    expect(routes).toEqual(['/users/@me/channels', '/channels/dm1/messages']);
+    expect(textOf(result)).toContain('"content": "hi"');
+  });
+
+  it('reads directly from a channel id', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return [];
+    });
+
+    await readDmMessages({ channelId: 'dm9' }, createContext(discord));
+
+    expect(captured?.r).toBe('/channels/dm9/messages');
   });
 });

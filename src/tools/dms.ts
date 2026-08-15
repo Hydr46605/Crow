@@ -2,11 +2,17 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
-import { READ_ONLY } from './annotations.js';
+import { IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { componentsSchema } from './components.js';
 import { embedsSchema } from './embeds.js';
-import { attachmentsSchema, buildMessageBody, summarizeMessage, type RawMessage } from './messages.js';
+import {
+  attachmentsSchema,
+  buildMessageBody,
+  fetchMessages,
+  summarizeMessage,
+  type RawMessage,
+} from './messages.js';
 import { errorResult, textResult } from './result.js';
 import { allowedMentionsSchema, snowflake } from './schemas.js';
 
@@ -75,6 +81,55 @@ export const listDmChannels = async (ctx: CrowContext): Promise<CallToolResult> 
   return textResult(JSON.stringify(result.value.map(summarizeDmChannel), null, 2));
 };
 
+/** Resolves (or creates) the DM channel with a user. */
+const resolveDmChannel = async (ctx: CrowContext, userId: string): Promise<RawDmChannel> =>
+  ctx.discord.request<RawDmChannel>('POST', '/users/@me/channels', { body: { recipient_id: userId } });
+
+const readDmMessagesInput = z
+  .object({
+    userId: snowflake.optional().describe('The ID of the user whose DM to read.'),
+    channelId: snowflake.optional().describe('The ID of the DM channel to read.'),
+    limit: z.number().int().min(1).max(100).optional().describe('Maximum number of messages (1-100).'),
+    before: snowflake.optional().describe('Return messages before this message ID.'),
+    after: snowflake.optional().describe('Return messages after this message ID.'),
+    around: snowflake.optional().describe('Return messages around this message ID.'),
+  })
+  .superRefine((args, ctx) => {
+    if (!args.userId && !args.channelId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide "userId" or "channelId".' });
+    }
+    if (args.userId && args.channelId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide only one of "userId" or "channelId".' });
+    }
+  });
+
+export type ReadDmMessagesArgs = z.infer<typeof readDmMessagesInput>;
+
+export const getDmChannel = async (
+  args: { readonly userId: string },
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('get_dm_channel', async () => resolveDmChannel(ctx, args.userId));
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(summarizeDmChannel(result.value), null, 2));
+};
+
+export const readDmMessages = async (
+  args: ReadDmMessagesArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('read_dm_messages', async () => {
+    const channelId = args.channelId ?? (await resolveDmChannel(ctx, args.userId as string)).id;
+    return fetchMessages(
+      channelId,
+      { limit: args.limit, before: args.before, after: args.after, around: args.around },
+      ctx,
+    );
+  });
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(result.value.map(summarizeMessage), null, 2));
+};
+
 export const sendDm = async (args: SendDmArgs, ctx: CrowContext): Promise<CallToolResult> => {
   const result = await attempt('send_dm', async () => {
     const channel = await ctx.discord.request<RawDmChannel>('POST', '/users/@me/channels', {
@@ -119,5 +174,25 @@ export const registerDmTools = (server: McpServer, ctx: CrowContext): void => {
       inputSchema: sendDmInput,
     },
     async (args) => sendDm(args, ctx),
+  );
+  server.registerTool(
+    'get_dm_channel',
+    {
+      title: 'Get DM channel',
+      description: 'Resolve (or create) the direct message channel with a user and return its details.',
+      inputSchema: { userId: snowflake.describe('The ID of the user.') },
+      annotations: IDEMPOTENT,
+    },
+    async (args) => getDmChannel(args, ctx),
+  );
+  server.registerTool(
+    'read_dm_messages',
+    {
+      title: 'Read DM messages',
+      description: 'Read the message history of a direct message, by user or channel ID.',
+      inputSchema: readDmMessagesInput,
+      annotations: READ_ONLY,
+    },
+    async (args) => readDmMessages(args, ctx),
   );
 };
