@@ -79,20 +79,27 @@ export const normalizeInviteCode = (input: string): string => {
 
 interface RawInvite {
   readonly code: string;
+  readonly type?: number;
+  readonly id?: string;
   readonly guild?: { readonly id: string; readonly name: string };
+  readonly guild_id?: string;
   readonly channel?: { readonly id: string; readonly name: string; readonly type: number };
   readonly inviter?: { readonly id: string; readonly username: string };
   readonly uses?: number;
   readonly max_uses?: number;
   readonly max_age?: number;
   readonly temporary?: boolean;
+  readonly created_at?: string;
   readonly expires_at?: string | null;
   readonly approximate_member_count?: number;
   readonly approximate_presence_count?: number;
+  readonly profile?: { readonly member_count?: number; readonly online_count?: number };
 }
 
 export interface InviteSummary {
   readonly code: string;
+  readonly inviteId?: string;
+  readonly type?: number;
   readonly guildId?: string;
   readonly guildName?: string;
   readonly channelId?: string;
@@ -102,14 +109,19 @@ export interface InviteSummary {
   readonly maxUses?: number;
   readonly maxAge?: number;
   readonly temporary?: boolean;
+  readonly createdAt?: string;
   readonly expiresAt?: string | null;
+  readonly memberCount?: number;
+  readonly onlineCount?: number;
   readonly approximateMemberCount?: number;
   readonly approximatePresenceCount?: number;
 }
 
 export const summarizeInvite = (invite: RawInvite): InviteSummary => ({
   code: invite.code,
-  guildId: invite.guild?.id,
+  inviteId: invite.id,
+  type: invite.type,
+  guildId: invite.guild_id ?? invite.guild?.id,
   guildName: invite.guild?.name,
   channelId: invite.channel?.id,
   channelName: invite.channel?.name,
@@ -118,7 +130,10 @@ export const summarizeInvite = (invite: RawInvite): InviteSummary => ({
   maxUses: invite.max_uses,
   maxAge: invite.max_age,
   temporary: invite.temporary,
+  createdAt: invite.created_at,
   expiresAt: invite.expires_at,
+  memberCount: invite.profile?.member_count,
+  onlineCount: invite.profile?.online_count,
   approximateMemberCount: invite.approximate_member_count,
   approximatePresenceCount: invite.approximate_presence_count,
 });

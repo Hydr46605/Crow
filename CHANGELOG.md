@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.1] - 2026-09-09
+### Fixed
+- Invite summaries now surface Discord's current invite fields (`inviteId`, `type`, `createdAt`, a top-level `guildId`, and the always-present `memberCount`/`onlineCount` from the community profile) instead of dropping them.
+
 ## [0.9.0] - 2026-09-08
 ### Security
 - File downloads now accept `http(s)` URLs only and are capped to their size limit while streaming (no unbounded or non-HTTP fetches).

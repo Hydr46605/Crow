@@ -8,6 +8,7 @@ import {
   listChannelInvites,
   listGuildInvites,
   normalizeInviteCode,
+  summarizeInvite,
 } from '../../src/tools/invites.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
@@ -26,6 +27,53 @@ describe('normalizeInviteCode', () => {
 
   it('rejects an invalid code', () => {
     expect(() => normalizeInviteCode('not a code!')).toThrow('Invalid invite code');
+  });
+});
+
+describe('summarizeInvite', () => {
+  it('maps the current invite fields including type, id, and profile counts', () => {
+    const summary = summarizeInvite({
+      code: 'AbCd123',
+      type: 0,
+      id: '1538653018394861608',
+      guild_id: 'g1',
+      guild: { id: 'g1', name: 'Guild' },
+      channel: { id: 'c1', name: 'Channel', type: 0 },
+      inviter: { id: 'u1', username: 'inviter' },
+      uses: 3,
+      max_uses: 5,
+      max_age: 3600,
+      temporary: false,
+      created_at: '2026-08-16T20:57:46.369708+00:00',
+      expires_at: '2026-08-16T21:57:46+00:00',
+      profile: { member_count: 19, online_count: 6 },
+      approximate_member_count: 19,
+      approximate_presence_count: 6,
+    });
+    expect(summary).toEqual({
+      code: 'AbCd123',
+      inviteId: '1538653018394861608',
+      type: 0,
+      guildId: 'g1',
+      guildName: 'Guild',
+      channelId: 'c1',
+      channelName: 'Channel',
+      inviterId: 'u1',
+      uses: 3,
+      maxUses: 5,
+      maxAge: 3600,
+      temporary: false,
+      createdAt: '2026-08-16T20:57:46.369708+00:00',
+      expiresAt: '2026-08-16T21:57:46+00:00',
+      memberCount: 19,
+      onlineCount: 6,
+      approximateMemberCount: 19,
+      approximatePresenceCount: 6,
+    });
+  });
+
+  it('falls back to the nested guild id when guild_id is absent', () => {
+    expect(summarizeInvite({ code: 'X', guild: { id: 'g2', name: 'G' } }).guildId).toBe('g2');
   });
 });
 
