@@ -6,9 +6,10 @@ import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { CHANNEL_TYPE_CODES, channelTypeName, type ChannelType } from './channel-types.js';
 import { requireConsent } from './consent.js';
+import { embedsSchema, normalizeEmbeds } from './embeds.js';
 import { formatPermissions, parsePermissions, permissionName, type PermissionName } from './permissions.js';
 import { errorResult, textResult } from './result.js';
-import { channelType, consent, snowflake } from './schemas.js';
+import { allowedMentionsSchema, channelType, consent, normalizeAllowedMentions, snowflake } from './schemas.js';
 
 const listChannelsInput = {
   guildId: snowflake.describe('The ID of the guild whose channels to list.'),
@@ -160,8 +161,28 @@ const listActiveThreadsInput = {
   channelId: snowflake.describe('The ID of the channel to list active threads for.'),
 };
 
+const forumMessageSchema = z
+  .object({
+    content: z
+      .string()
+      .min(1)
+      .max(2000)
+      .optional()
+      .describe('Initial post content (1-2000 characters).'),
+    embeds: embedsSchema.optional(),
+    allowedMentions: allowedMentionsSchema,
+  })
+  .superRefine((message, ctx) => {
+    if (!message.content && !message.embeds) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide "content", "embeds", or both.',
+      });
+    }
+  });
+
 const createThreadInput = {
-  channelId: snowflake.describe('The ID of the channel (or forum post) to create the thread in.'),
+  channelId: snowflake.describe('The ID of the channel (or forum) to create the thread in.'),
   name: z.string().min(1).max(100).describe('Thread name (1-100 characters).'),
   messageId: snowflake
     .optional()
@@ -178,6 +199,10 @@ const createThreadInput = {
     .max(21600)
     .optional()
     .describe('Slowmode per user in seconds (threads only).'),
+  message: forumMessageSchema
+    .optional()
+    .describe('The initial post content (required for forum posts).'),
+  appliedTags: z.array(snowflake).optional().describe('Forum tag IDs to apply to the post.'),
 };
 
 const modifyThreadInput = {
@@ -469,6 +494,16 @@ export const createThread = async (
     route = `/channels/${args.channelId}/threads`;
     body.type = args.type === 'private' ? 12 : 11;
     if (args.rateLimitPerUser !== undefined) body.rate_limit_per_user = args.rateLimitPerUser;
+    if (args.message) {
+      const message: Record<string, unknown> = {};
+      if (args.message.content !== undefined) message.content = args.message.content;
+      if (args.message.embeds) message.embeds = normalizeEmbeds(args.message.embeds);
+      if (args.message.allowedMentions) {
+        message.allowed_mentions = normalizeAllowedMentions(args.message.allowedMentions);
+      }
+      body.message = message;
+    }
+    if (args.appliedTags !== undefined) body.applied_tags = args.appliedTags;
   }
 
   const result = await attempt('create_thread', () =>
@@ -476,6 +511,20 @@ export const createThread = async (
   );
   if (!result.ok) return errorResult(result.error);
   return textResult(JSON.stringify(summarizeChannel(result.value), null, 2));
+};
+
+export const listArchivedThreads = async (
+  args: { readonly channelId: string },
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('list_archived_threads', () =>
+    ctx.discord.request<{ readonly threads: RawChannel[] }>(
+      'GET',
+      `/channels/${args.channelId}/threads/archived/public`,
+    ),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(result.value.threads.map(summarizeChannel), null, 2));
 };
 
 export const modifyThread = async (
@@ -603,10 +652,22 @@ export const registerChannelTools = (server: McpServer, ctx: CrowContext): void 
     'create_thread',
     {
       title: 'Create thread',
-      description: 'Create a thread in a channel, or start one from an existing message.',
+      description:
+        'Create a thread in a channel, start one from an existing message, or create a forum ' +
+        'post (with initial content and tags).',
       inputSchema: createThreadInput,
     },
     async (args) => createThread(args, ctx),
+  );
+  server.registerTool(
+    'list_archived_threads',
+    {
+      title: 'List archived threads',
+      description: 'List the archived public threads (forum posts) in a channel.',
+      inputSchema: { channelId: snowflake.describe('The ID of the forum channel.') },
+      annotations: READ_ONLY,
+    },
+    async (args) => listArchivedThreads(args, ctx),
   );
   server.registerTool(
     'modify_thread',

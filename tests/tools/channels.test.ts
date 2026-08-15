@@ -8,6 +8,7 @@ import {
   editChannelPermissions,
   getChannel,
   listActiveThreads,
+  listArchivedThreads,
   listChannels,
   modifyChannel,
   modifyThread,
@@ -249,6 +250,47 @@ describe('createThread', () => {
 
     expect(captured?.r).toBe('/channels/1/messages/9/threads');
     expect(captured?.o.body).toEqual({ name: 'thread', auto_archive_duration: 60 });
+  });
+
+  it('creates a forum post with initial content and tags', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawChannel;
+    });
+
+    await createThread(
+      {
+        channelId: '1',
+        name: 'post',
+        message: { content: 'hello', embeds: [{ title: 'T' }] },
+        appliedTags: ['t1'],
+      },
+      createContext(discord),
+    );
+
+    expect(captured?.r).toBe('/channels/1/threads');
+    expect(captured?.o.body).toEqual({
+      name: 'post',
+      type: 11,
+      message: { content: 'hello', embeds: [{ title: 'T' }] },
+      applied_tags: ['t1'],
+    });
+  });
+});
+
+describe('listArchivedThreads', () => {
+  it('requests the archived-public-threads route', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return { threads: [{ ...rawChannel, id: 't1', type: 11 }] };
+    });
+
+    const result = await listArchivedThreads({ channelId: '1' }, createContext(discord));
+
+    expect(captured?.r).toBe('/channels/1/threads/archived/public');
+    expect(textOf(result)).toContain('"id": "t1"');
   });
 });
 
