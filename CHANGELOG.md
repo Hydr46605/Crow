@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0] - 2026-09-15
+### Added
+- Interaction values: the gateway logs recent component and modal interactions (including selected values and typed inputs) and exposes them via `list_recent_interactions`; reply content and embeds support `{values}`, `{values.N}`, and `{input.<customId>}` placeholders.
+- Community admin: `get_welcome_screen`, `modify_welcome_screen`, `get_onboarding`, `modify_onboarding`, `get_member_verification`, and `modify_member_verification`.
+- Direct message completion: `get_dm_channel` and `read_dm_messages` (by user or channel ID).
+### Changed
+- `parseInteraction` now extracts submitted values, modal inputs, user, and channel from gateway interactions.
+- `read_messages` and `read_dm_messages` share a single `fetchMessages` helper.
+
 ## [0.10.0] - 2026-09-12
 ### Added
 - Direct messages: `list_dm_channels` and `send_dm` (resolves the DM channel, then sends content, embeds, components, and/or attachments).

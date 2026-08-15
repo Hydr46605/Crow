@@ -47,7 +47,10 @@ local path, a URL, or inline base64/data-URI data.
 Components (buttons, string/user/role/mentionable/channel select menus) can be attached to messages.
 Run `crow gateway` to connect to the Gateway and receive the resulting interactions live: the actions
 runtime maps a component's `custom_id` to a reply or a modal, and Crow answers with the matching
-callback. Modal actions open a form (up to 5 text inputs) and reply when it is submitted.
+callback. Modal actions open a form (up to 5 text inputs) and reply when it is submitted. The
+values users submit (selected menu options and modal inputs) are logged and readable via
+`list_recent_interactions`, and replies can reference them with `{values}`, `{values.N}`, and
+`{input.<customId>}` placeholders.
 
 ## Consent model
 
@@ -67,7 +70,8 @@ Every tool carries MCP annotations so clients can reason about safety without re
   `bulk_delete_messages`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
   `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `modify_role`,
-  `modify_member`, `modify_current_user`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
+  `modify_member`, `modify_current_user`, `modify_welcome_screen`, `modify_onboarding`,
+  `modify_member_verification`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
   `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
   `register_action`, `remove_action`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
@@ -107,7 +111,9 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
 | `list_dm_channels` | | List the bot's DM channels and their recipients. |
+| `get_dm_channel` | `userId` | Resolve (or create) the DM channel with a user. |
 | `send_dm` | `userId`, `content?`, `embeds?`, `components?`, `attachments?`, `allowedMentions?`, `tts?` | Send a DM to a user (creates the DM channel if needed). |
+| `read_dm_messages` | `userId` or `channelId`, `limit?`, `before?`, `after?`, `around?` | Read the message history of a DM. |
 
 ### Channels & threads
 | Tool | Inputs | Purpose |
@@ -197,12 +203,23 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | --- | --- | --- |
 | `list_audit_log_entries` | `guildId`, `userId?`, `actionType?`, `before?`, `limit?` | Read the guild audit log. |
 
+### Community
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `get_welcome_screen` | `guildId` | Get a guild's welcome screen. |
+| `modify_welcome_screen` | `guildId`, `enabled?`, `description?`, `welcomeChannels?` | Modify a guild's welcome screen. |
+| `get_onboarding` | `guildId` | Get a guild's onboarding (prompts + default channels). |
+| `modify_onboarding` | `guildId`, `enabled?`, `mode?`, `prompts?`, `defaultChannels?` | Modify a guild's onboarding. |
+| `get_member_verification` | `guildId` | Get a guild's membership screening. |
+| `modify_member_verification` | `guildId`, `enabled?`, `description?`, `formFields?` | Modify a guild's membership screening. |
+
 ### Actions
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
 | `register_action` | `kind?` (`reply` default, or `modal`), `customId`, `content?`, `embeds?`, `ephemeral?`, plus `title`, `inputs`, `submitCustomId` for modals | Register or replace a reply or modal action. |
 | `list_actions` | | List registered actions. |
 | `remove_action` | `customId` | Remove a registered action. |
+| `list_recent_interactions` | `limit?` | List recent component/modal interactions and the values users submitted. |
 
 ### Moderation
 | Tool | Inputs | Purpose |
@@ -236,5 +253,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `roles` | done | Manage roles and member role assignment. |
 | `reactions` | done | Add and remove message reactions. |
 | `audit` | done | Read the guild audit log. |
-| `dms` | done | Send direct messages to users. |
+| `dms` | done | List, send, and read direct messages. |
 | `self` | done | Read and modify the bot's own profile. |
+| `community` | done | Manage the welcome screen, onboarding, and membership screening. |
+| `interaction-values` | done | Capture and substitute submitted select/modal values. |
