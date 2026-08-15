@@ -8,7 +8,10 @@ import { dispatchInteraction } from '../../src/gateway/transport.js';
 
 const makeRuntime = (): { runtime: ActionRuntime; dir: string } => {
   const dir = mkdtempSync(join(tmpdir(), 'crow-transport-'));
-  return { runtime: new ActionRuntime(join(dir, 'actions.json')), dir };
+  return {
+    runtime: new ActionRuntime(join(dir, 'actions.json'), join(dir, 'interactions.json')),
+    dir,
+  };
 };
 
 describe('dispatchInteraction', () => {
@@ -40,6 +43,36 @@ describe('dispatchInteraction', () => {
         id: '111',
         token: 'itok',
         callback: { type: 4, data: { content: 'hi' } },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records the interaction with its submitted values', async () => {
+    const { runtime, dir } = makeRuntime();
+    try {
+      runtime.register({ kind: 'reply', customId: 'pick', content: 'ok' });
+      const discord = new DiscordClient('token', async () => null, undefined, async () => null);
+
+      await dispatchInteraction(runtime, discord, {
+        id: '111',
+        type: 3,
+        token: 'itok',
+        userId: 'u1',
+        channelId: 'ch1',
+        data: { custom_id: 'pick', values: ['red'] },
+      });
+
+      const records = runtime.listInteractions();
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        id: '111',
+        customId: 'pick',
+        type: 3,
+        values: ['red'],
+        userId: 'u1',
+        channelId: 'ch1',
       });
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -55,6 +55,41 @@ describe('parseInteraction', () => {
     expect(parseInteraction({ id: '1', token: 'tok' })).toBeNull();
     expect(parseInteraction({ id: '1', type: 3 })).toBeNull();
   });
+
+  it('extracts values, inputs, user, and channel', () => {
+    expect(
+      parseInteraction({
+        id: '1',
+        type: 3,
+        token: 'tok',
+        channel_id: 'ch1',
+        user: { id: 'u1' },
+        data: {
+          custom_id: 'pick',
+          values: ['a', 'b'],
+          components: [{ components: [{ custom_id: 'name', value: 'Alice' }] }],
+        },
+      }),
+    ).toEqual({
+      id: '1',
+      type: 3,
+      token: 'tok',
+      channelId: 'ch1',
+      userId: 'u1',
+      data: {
+        custom_id: 'pick',
+        values: ['a', 'b'],
+        components: [{ components: [{ custom_id: 'name', value: 'Alice' }] }],
+      },
+    });
+  });
+
+  it('reads the user id from the member object when there is no top-level user', () => {
+    expect(
+      parseInteraction({ id: '1', type: 3, token: 'tok', member: { user: { id: 'u2' } }, data: { custom_id: 'x' } })
+        ?.userId,
+    ).toBe('u2');
+  });
 });
 
 describe('payload builders', () => {

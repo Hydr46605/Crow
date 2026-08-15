@@ -31,6 +31,18 @@ export const removeAction = async (
   return textResult(result.value ? `Removed action "${args.customId}".` : `No action registered for "${args.customId}".`);
 };
 
+export const listRecentInteractions = async (
+  args: { readonly limit?: number },
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('list_recent_interactions', async () => {
+    const limit = args.limit ?? 50;
+    return ctx.actions.listInteractions().slice(0, limit);
+  });
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify(result.value, null, 2));
+};
+
 export const registerActionTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'register_action',
@@ -65,5 +77,19 @@ export const registerActionTools = (server: McpServer, ctx: CrowContext): void =
       annotations: IDEMPOTENT,
     },
     async (args) => removeAction(args, ctx),
+  );
+  server.registerTool(
+    'list_recent_interactions',
+    {
+      title: 'List recent interactions',
+      description:
+        'List the most recent component and modal interactions, including the values users ' +
+        'selected or typed.',
+      inputSchema: {
+        limit: z.number().int().min(1).max(100).optional().describe('Maximum number of interactions (default 50).'),
+      },
+      annotations: READ_ONLY,
+    },
+    async (args) => listRecentInteractions(args, ctx),
   );
 };

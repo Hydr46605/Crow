@@ -1,4 +1,5 @@
 import { ActionRuntime } from '../actions/runtime.js';
+import { extractInputs, extractValues } from '../actions/substitute.js';
 import { loadConfig } from '../config.js';
 import { DiscordClient } from '../discord/client.js';
 import { redactSecrets } from '../security/redact.js';
@@ -15,6 +16,17 @@ export const dispatchInteraction = async (
   discord: DiscordClient,
   interaction: GatewayInteraction,
 ): Promise<boolean> => {
+  actions.recordInteraction({
+    id: interaction.id,
+    customId: interaction.data?.custom_id ?? '',
+    type: interaction.type,
+    values: extractValues(interaction),
+    inputs: extractInputs(interaction),
+    userId: interaction.userId,
+    channelId: interaction.channelId,
+    timestamp: new Date().toISOString(),
+  });
+
   const dispatch = actions.resolve(interaction);
   if (!dispatch.matched || !dispatch.callback) return false;
   await discord.interactionCallback(interaction.id, interaction.token, dispatch.callback);

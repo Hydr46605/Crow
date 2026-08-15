@@ -129,12 +129,43 @@ describe('resolveInteraction', () => {
   it('returns unmatched when there is no custom_id', () => {
     expect(resolveInteraction(map, {})).toEqual({ matched: false });
   });
+
+  it('substitutes selected values into the reply', () => {
+    const withValues: Action = { kind: 'reply', customId: 'pick', content: 'You chose {values}' };
+    const result = resolveInteraction(new Map([['pick', withValues]]), {
+      type: INTERACTION_COMPONENT,
+      data: { custom_id: 'pick', values: ['red', 'blue'] },
+    });
+    expect(result.callback).toEqual({ type: 4, data: { content: 'You chose red, blue' } });
+  });
+
+  it('substitutes modal input values into the submit reply', () => {
+    const form: Action = {
+      kind: 'modal',
+      customId: 'open',
+      title: 'Form',
+      inputs: [{ customId: 'name', label: 'Name', style: 'short' }],
+      submitCustomId: 'submit',
+      content: 'Thanks {input.name}!',
+    };
+    const result = resolveInteraction(new Map([['open', form]]), {
+      type: INTERACTION_MODAL_SUBMIT,
+      data: {
+        custom_id: 'submit',
+        components: [{ components: [{ custom_id: 'name', value: 'Alice' }] }],
+      },
+    });
+    expect(result.callback).toEqual({ type: 4, data: { content: 'Thanks Alice!' } });
+  });
 });
 
 describe('ActionRuntime', () => {
   const makeRuntime = (): { runtime: ActionRuntime; dir: string } => {
     const dir = mkdtempSync(join(tmpdir(), 'crow-actions-'));
-    return { runtime: new ActionRuntime(join(dir, 'actions.json')), dir };
+    return {
+      runtime: new ActionRuntime(join(dir, 'actions.json'), join(dir, 'interactions.json')),
+      dir,
+    };
   };
 
   it('registers, lists, and removes actions', () => {
@@ -179,6 +210,25 @@ describe('ActionRuntime', () => {
       expect(runtime.resolve({ type: INTERACTION_COMPONENT, data: { custom_id: 'hello' } }).matched).toBe(
         true,
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records and lists recent interactions', () => {
+    const { runtime, dir } = makeRuntime();
+    try {
+      runtime.recordInteraction({
+        id: 'i1',
+        customId: 'c',
+        type: 3,
+        values: ['v'],
+        inputs: { a: 'b' },
+        timestamp: 't',
+      });
+      expect(runtime.listInteractions()).toEqual([
+        { id: 'i1', customId: 'c', type: 3, values: ['v'], inputs: { a: 'b' }, timestamp: 't' },
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { ActionRuntime } from '../../src/actions/runtime.js';
 import type { Action } from '../../src/actions/types.js';
 import { DiscordClient } from '../../src/discord/client.js';
-import { listActions, registerAction, removeAction } from '../../src/tools/actions.js';
+import { listActions, listRecentInteractions, registerAction, removeAction } from '../../src/tools/actions.js';
 import { createContext, textOf } from '../helpers.js';
 
 const makeContext = () => {
   const dir = mkdtempSync(join(tmpdir(), 'crow-actions-tools-'));
-  const runtime = new ActionRuntime(join(dir, 'actions.json'));
+  const runtime = new ActionRuntime(join(dir, 'actions.json'), join(dir, 'interactions.json'));
   const discord = new DiscordClient('token');
   return { ctx: createContext(discord, runtime), runtime, dir };
 };
@@ -56,6 +56,26 @@ describe('listActions', () => {
     try {
       runtime.register(replyAction);
       const result = await listActions(ctx);
+      expect(textOf(result)).toContain('"customId": "x"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('listRecentInteractions', () => {
+  it('lists recorded interactions', async () => {
+    const { ctx, runtime, dir } = makeContext();
+    try {
+      runtime.recordInteraction({
+        id: 'i1',
+        customId: 'x',
+        type: 3,
+        values: ['v'],
+        inputs: {},
+        timestamp: 't',
+      });
+      const result = await listRecentInteractions({ limit: 10 }, ctx);
       expect(textOf(result)).toContain('"customId": "x"');
     } finally {
       rmSync(dir, { recursive: true, force: true });

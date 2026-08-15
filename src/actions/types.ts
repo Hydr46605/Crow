@@ -71,3 +71,17 @@ export const actionSchema = z.preprocess(
   },
   actionUnionSchema,
 );
+
+/** A logged component/modal interaction, with the values the user submitted. */
+export const interactionRecordSchema = z.object({
+  id: z.string().min(1),
+  customId: z.string().min(1),
+  type: z.number().int(),
+  values: z.array(z.string()),
+  inputs: z.record(z.string(), z.string()),
+  userId: z.string().optional(),
+  channelId: z.string().optional(),
+  timestamp: z.string().min(1),
+});
+
+export type InteractionRecord = z.infer<typeof interactionRecordSchema>;

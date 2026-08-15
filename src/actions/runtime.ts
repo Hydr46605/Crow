@@ -1,8 +1,17 @@
 import { normalizeTextInputs } from '../tools/components.js';
 import type { DiscordEmbed } from '../tools/embeds.js';
 import { normalizeEmbed } from '../tools/embeds.js';
-import { actionsFilePath, readActionsFile, writeActionsFile } from './store.js';
-import type { Action, ModalAction, ReplyAction } from './types.js';
+import {
+  actionsFilePath,
+  interactionsFilePath,
+  MAX_INTERACTIONS,
+  readActionsFile,
+  readInteractionsFile,
+  writeActionsFile,
+  writeInteractionsFile,
+} from './store.js';
+import { extractInputs, extractValues, substituteReply } from './substitute.js';
+import type { Action, InteractionRecord, ModalAction, ReplyAction } from './types.js';
 
 /** Discord interaction types the runtime understands. */
 export const INTERACTION_COMPONENT = 3;
@@ -15,7 +24,13 @@ export const CALLBACK_MODAL = 9;
 /** The minimal Discord interaction shape the runtime needs to resolve. */
 export interface InteractionPayload {
   readonly type?: number;
-  readonly data?: { readonly custom_id?: string };
+  readonly data?: {
+    readonly custom_id?: string;
+    readonly values?: readonly string[];
+    readonly components?: readonly {
+      readonly components?: readonly { readonly custom_id?: string; readonly value?: string }[];
+    }[];
+  };
 }
 
 /** A type-4 callback: channel message with source. */
@@ -52,10 +67,15 @@ export const EPHEMERAL_FLAG = 64;
 type ReplyFields = Pick<ReplyAction, 'content' | 'embeds' | 'ephemeral'>;
 
 /** Builds the type-4 callback data for a reply action or a modal submit. */
-const replyData = (action: ReplyFields): ChannelMessageCallback['data'] => {
+const replyData = (
+  action: ReplyFields,
+  values: readonly string[],
+  inputs: Readonly<Record<string, string>>,
+): ChannelMessageCallback['data'] => {
+  const substituted = substituteReply(action, values, inputs);
   const data: { content?: string; embeds?: DiscordEmbed[]; flags?: number } = {};
-  if (action.content !== undefined) data.content = action.content;
-  if (action.embeds !== undefined) data.embeds = action.embeds.map(normalizeEmbed);
+  if (substituted.content !== undefined) data.content = substituted.content;
+  if (substituted.embeds !== undefined) data.embeds = substituted.embeds.map(normalizeEmbed);
   if (action.ephemeral) data.flags = EPHEMERAL_FLAG;
   return data;
 };
@@ -82,6 +102,8 @@ export const resolveInteraction = (
   if (customId === undefined) return { matched: false };
 
   const type = interaction.type ?? INTERACTION_COMPONENT;
+  const values = extractValues(interaction);
+  const inputs = extractInputs(interaction);
 
   if (type === INTERACTION_COMPONENT) {
     const action = actions.get(customId);
@@ -89,7 +111,11 @@ export const resolveInteraction = (
     if (action.kind === 'modal') {
       return { matched: true, customId, callback: { type: CALLBACK_MODAL, data: modalData(action) } };
     }
-    return { matched: true, customId, callback: { type: CALLBACK_CHANNEL_MESSAGE, data: replyData(action) } };
+    return {
+      matched: true,
+      customId,
+      callback: { type: CALLBACK_CHANNEL_MESSAGE, data: replyData(action, values, inputs) },
+    };
   }
 
   if (type === INTERACTION_MODAL_SUBMIT) {
@@ -98,7 +124,7 @@ export const resolveInteraction = (
         return {
           matched: true,
           customId,
-          callback: { type: CALLBACK_CHANNEL_MESSAGE, data: replyData(action) },
+          callback: { type: CALLBACK_CHANNEL_MESSAGE, data: replyData(action, values, inputs) },
         };
       }
     }
@@ -116,13 +142,27 @@ export const resolveInteraction = (
 export class ActionRuntime {
   private readonly actions = new Map<string, Action>();
 
-  constructor(private readonly storePath: string = actionsFilePath()) {}
+  constructor(
+    private readonly storePath: string = actionsFilePath(),
+    private readonly interactionsPath: string = interactionsFilePath(),
+  ) {}
 
   /** Loads persisted actions into memory. Missing or invalid files load as empty. */
   load(): void {
     for (const action of readActionsFile(this.storePath)) {
       this.actions.set(action.customId, action);
     }
+  }
+
+  /** Records a recent interaction (newest first, capped) for later inspection. */
+  recordInteraction(record: InteractionRecord): void {
+    const current = readInteractionsFile(this.interactionsPath);
+    writeInteractionsFile(this.interactionsPath, [record, ...current].slice(0, MAX_INTERACTIONS));
+  }
+
+  /** Returns the recorded interactions, newest first. */
+  listInteractions(): InteractionRecord[] {
+    return readInteractionsFile(this.interactionsPath);
   }
 
   private persist(): void {
