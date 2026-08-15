@@ -3,6 +3,7 @@ import type { CrowContext } from '../context.js';
 import { registerActionTools } from './actions.js';
 import { registerAuditLogTools } from './audit-log.js';
 import { registerChannelTools } from './channels.js';
+import { registerCommunityTools } from './community.js';
 import { registerDmTools } from './dms.js';
 import { registerEmbedTools } from './embeds.js';
 import { registerEmojiTools } from './emojis.js';
@@ -32,6 +33,7 @@ const registrars: readonly ToolRegistrar[] = [
   registerMemberTools,
   registerMessageTools,
   registerChannelTools,
+  registerCommunityTools,
   registerDmTools,
   registerRoleTools,
   registerReactionTools,
