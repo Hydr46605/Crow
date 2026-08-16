@@ -12,6 +12,7 @@ import {
 import { IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
 import { errorResult, textResult } from './result.js';
+import { snowflake } from './schemas.js';
 
 const usernameSchema = z
   .string()
@@ -52,6 +53,35 @@ const modifyCurrentUserInput = z
   });
 
 export type ModifyCurrentUserArgs = z.infer<typeof modifyCurrentUserInput>;
+
+const modifyCurrentMemberInput = z
+  .object({
+    guildId: snowflake.describe('The ID of the guild.'),
+    nick: z
+      .string()
+      .min(1)
+      .max(32)
+      .optional()
+      .describe("The bot's new nickname in this guild (1-32 characters)."),
+    avatar: profileImageSchema.optional().describe('New guild avatar (data URI or file source).'),
+    banner: profileImageSchema.optional().describe('New guild banner (data URI or file source).'),
+    bio: z
+      .string()
+      .min(1)
+      .max(190)
+      .optional()
+      .describe('New guild "About Me" bio (1-190 characters).'),
+  })
+  .superRefine((args, ctx) => {
+    if (!args.nick && !args.avatar && !args.banner && !args.bio) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide at least one of "nick", "avatar", "banner", or "bio".',
+      });
+    }
+  });
+
+export type ModifyCurrentMemberArgs = z.infer<typeof modifyCurrentMemberInput>;
 
 interface RawCurrentUser {
   readonly id: string;
@@ -115,6 +145,23 @@ export const modifyCurrentUser = async (
   return textResult(JSON.stringify(summarizeCurrentUser(result.value), null, 2));
 };
 
+export const modifyCurrentMember = async (
+  args: ModifyCurrentMemberArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('modify_current_member', async () => {
+    const body: Record<string, unknown> = {};
+    if (args.nick !== undefined) body.nick = args.nick;
+    if (args.avatar !== undefined) body.avatar = await imageToDataUri(args.avatar);
+    if (args.banner !== undefined) body.banner = await imageToDataUri(args.banner);
+    if (args.bio !== undefined) body.bio = args.bio;
+
+    return ctx.discord.request<unknown>('PATCH', `/guilds/${args.guildId}/members/@me`, { body });
+  });
+  if (!result.ok) return errorResult(result.error);
+  return textResult(`Updated the bot's member profile in guild ${args.guildId}.`);
+};
+
 export const registerProfileTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'get_current_user',
@@ -136,5 +183,17 @@ export const registerProfileTools = (server: McpServer, ctx: CrowContext): void 
       annotations: IDEMPOTENT,
     },
     async (args) => modifyCurrentUser(args, ctx),
+  );
+  server.registerTool(
+    'modify_current_member',
+    {
+      title: 'Modify current member',
+      description:
+        "Modify the bot's own member profile in a guild: nickname, guild avatar, guild banner, and/or " +
+        'guild bio. Avatar and banner accept a data URI or a file source (path/url/data).',
+      inputSchema: modifyCurrentMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => modifyCurrentMember(args, ctx),
   );
 };
