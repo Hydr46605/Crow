@@ -11,8 +11,8 @@ A tool module exports:
 2. `register<Name>Tool(s)(server, ctx)` functions that bind the handlers to the MCP server with a
    Zod input schema.
 
-`ctx` is the shared `CrowContext` (`config`, `discord` REST client, and `actions` runtime) handed to
-every handler.
+`ctx` is the shared `CrowContext` (`config`, `discord` REST client, `actions` runtime, and `notes`
+store) handed to every handler.
 All Discord HTTP flows through the single `DiscordClient`, which adds auth, rate limiting, and
 token redaction on errors. Handlers normalize errors with the `attempt` helper.
 
@@ -24,6 +24,7 @@ Shared building blocks live alongside the tools:
 - `channel-types.ts`: channel type codes and friendly names.
 - `files.ts`: file-source resolution (path/url/data) with size limits and content-type inference.
 - `actions/`: the action registry plus the pure `resolveInteraction` hook.
+- `notes/`: the local informational note store (schema, file persistence, runtime).
 - `gateway/`: the Gateway connection (heartbeat, resume, reconnect) and the interaction daemon.
 
 ## Selection pipeline
@@ -74,7 +75,7 @@ Every tool carries MCP annotations so clients can reason about safety without re
   `modify_welcome_screen`, `modify_onboarding`,
   `modify_member_verification`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
   `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
-  `register_action`, `remove_action`) set `idempotentHint`.
+  `register_action`, `remove_action`, `add_note`, `remove_note`, `clear_notes`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
 
 Each tool also has a human-readable `title` and per-field descriptions in its input schema.
@@ -95,6 +96,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `get_member` | `guildId`, `userId` | Get a single guild member. |
 | `list_channels` | `guildId` | List the channels in a guild. |
 | `get_channel` | `channelId` | Get a single channel by ID, with settings and overwrites. |
+| `get_guild_overview` | `guildId` | One-call orientation: guild basics + boost info, channels grouped by category, roles. |
 
 ### Messaging & embeds
 | Tool | Inputs | Purpose |
@@ -238,6 +240,17 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `remove_action` | `customId` | Remove a registered action. |
 | `list_recent_interactions` | `limit?` | List recent component/modal interactions and the values users submitted. |
 
+### Notes
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `add_note` | `targetType`, `targetId`, `text`, `key?` | Attach a local note to an object (upserts by key when provided). |
+| `list_notes` | `targetType?`, `targetId?`, `query?` | List local notes, optionally filtered or text-searched. |
+| `remove_note` | `noteId` | Remove a single note by ID. |
+| `clear_notes` | `targetType`, `targetId` | Remove every note for an object. |
+
+> Notes are local and informational: they live in `~/.crow/notes.json` and are never sent to
+> Discord. Use them to record context that should survive across agents and sessions.
+
 ### Moderation
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
@@ -275,4 +288,6 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `community` | done | Manage the welcome screen, onboarding, and membership screening. |
 | `boost` | done | Read a guild's Server Boost info. |
 | `voice` | done | Modify stage-channel voice states. |
+| `notes` | done | Local informational notes attached to Discord objects. |
+| `overview` | done | One-call guild orientation. |
 | `interaction-values` | done | Capture and substitute submitted select/modal values. |

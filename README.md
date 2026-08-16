@@ -33,6 +33,8 @@ and registering it.
 ## Capabilities
 
 - **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
+- **Overview**: `get_guild_overview` gives a one-call orientation of a guild (basics + boost info, channels grouped by category, and roles).
+- **Notes**: attach local, informational notes to users, roles, channels, messages, guilds, webhooks, and more, so context survives across agent sessions.
 - **Messaging**: read, send, edit, delete, pin, and bulk-delete messages.
 - **Direct messages**: list DM channels, send DMs, and read DM history with content, embeds, components, and attachments.
 - **Embeds**: build rich embeds with Discord's limits enforced.
@@ -71,6 +73,7 @@ permission the tools safely.
 | --- | --- |
 | Health | `ping` |
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
+| Overview | `get_guild_overview` |
 | Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message`, `pin_message`, `unpin_message`, `bulk_delete_messages` |
 | Direct messages | `list_dm_channels`, `get_dm_channel`, `send_dm`, `read_dm_messages` |
 | Embeds | `create_embed` |
@@ -89,6 +92,7 @@ permission the tools safely.
 | Emojis | `list_emojis`, `get_emoji`, `create_emoji`, `modify_emoji`, `delete_emoji` |
 | Stickers | `list_stickers`, `get_sticker`, `list_sticker_packs`, `get_sticker_pack`, `create_sticker`, `modify_sticker`, `delete_sticker` |
 | Actions | `register_action`, `list_actions`, `remove_action`, `list_recent_interactions` |
+| Notes | `add_note`, `list_notes`, `remove_note`, `clear_notes` |
 | Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |
 | Raw | `discord_request` |
 

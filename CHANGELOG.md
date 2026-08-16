@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0] - 2026-09-21
+### Added
+- Notes: `add_note`, `list_notes`, `remove_note`, and `clear_notes` attach local, informational notes to Discord objects (users, members, roles, channels, threads, messages, guilds, webhooks, emojis, stickers, invites, or any custom type) so context survives across agents and sessions. Notes live in `~/.crow/notes.json` and are never sent to Discord; a note with a `key` is upserted instead of duplicated.
+- Overview: `get_guild_overview` gives a one-call orientation of a guild (basics + boost info, channels grouped by category, and roles), reporting any unreadable section in `errors` instead of failing the whole call.
+### Changed
+- `CrowContext` now carries a `notes` runtime alongside config, the Discord client, and the action runtime.
+
 ## [1.0.0] - 2026-09-18
 ### Added
 - Boost info: `get_boost_info` (premium tier and level name, boost count, progress bar state).

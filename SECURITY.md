@@ -15,7 +15,7 @@ maintainer directly.
 - The bot token is loaded into memory only, validated to reject whitespace, and never logged;
   error messages are scrubbed with `[REDACTED]` before being returned or printed.
 - Webhook tokens and interaction tokens are also redacted from any error Crow surfaces.
-- Credentials and the action registry are stored owner-readable (`0600`) under `~/.crow`.
+- Credentials, the action registry, and local notes are stored owner-readable (`0600`) under `~/.crow`. Notes never leave the machine and are never sent to Discord.
 - File downloads for attachments, stickers, and emoji accept `http(s)` URLs only and are capped to
   their size limit while streaming, so a malicious URL cannot exhaust memory.
 
