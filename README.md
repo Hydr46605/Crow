@@ -41,10 +41,12 @@ and registering it.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Roles**: create, modify, and delete roles; assign and remove them from members.
 - **Members**: edit nicknames, voice state, and timeouts.
-- **Self**: read and modify the bot's own profile (username, avatar, banner, bio).
+- **Self**: read and modify the bot's own profile (username, avatar, banner, bio) and its per-guild member profile (nickname, guild avatar/banner/bio).
+- **Voice**: modify stage-channel voice states (suppress, request-to-speak, and move between stage channels).
 - **Reactions**: add, remove, and list message reactions.
 - **Audit**: read the guild audit log.
 - **Community**: manage the welcome screen, onboarding, and membership screening.
+- **Boost**: read a guild's Server Boost level, boost count, and progress bar state.
 - **Webhooks**: create, manage, and execute webhooks.
 - **Attachments**: send files, images, and GIFs alongside messages.
 - **Invites**: list, create, inspect, and delete guild and channel invites.
@@ -76,10 +78,12 @@ permission the tools safely.
 | Guild config | `modify_guild` |
 | Roles | `list_roles`, `create_role`, `modify_role`, `delete_role` |
 | Members | `modify_member`, `add_role_to_member`, `remove_role_from_member` |
-| Self | `get_current_user`, `modify_current_user` |
+| Self | `get_current_user`, `modify_current_user`, `modify_current_member` |
+| Voice | `modify_voice_state` |
 | Reactions | `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, `list_reactions` |
 | Audit | `list_audit_log_entries` |
 | Community | `get_welcome_screen`, `modify_welcome_screen`, `get_onboarding`, `modify_onboarding`, `get_member_verification`, `modify_member_verification` |
+| Boost | `get_boost_info` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `modify_webhook`, `delete_webhook`, `execute_webhook` |
 | Invites | `list_guild_invites`, `list_channel_invites`, `get_invite`, `get_vanity_url`, `create_invite`, `delete_invite` |
 | Emojis | `list_emojis`, `get_emoji`, `create_emoji`, `modify_emoji`, `delete_emoji` |
@@ -161,7 +165,6 @@ npm start
 - ESM-only.
 - Discord API v10 via `discord.js`.
 - Distributed via GitHub (not npm); install with the scripts above.
-- Pre-1.0: the tool surface may still change during the `0.x` line.
 
 ## License
 

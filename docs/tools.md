@@ -70,7 +70,8 @@ Every tool carries MCP annotations so clients can reason about safety without re
   `bulk_delete_messages`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
   `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `modify_role`,
-  `modify_member`, `modify_current_user`, `modify_welcome_screen`, `modify_onboarding`,
+  `modify_member`, `modify_current_user`, `modify_current_member`, `modify_voice_state`,
+  `modify_welcome_screen`, `modify_onboarding`,
   `modify_member_verification`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
   `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
   `register_action`, `remove_action`) set `idempotentHint`.
@@ -189,6 +190,16 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | --- | --- | --- |
 | `get_current_user` | | Get the bot's own profile (username, avatar, banner, bio). |
 | `modify_current_user` | `username?`, `avatar?`, `banner?`, `bio?` | Modify the bot's own profile (avatar/banner accept a data URI or file source). |
+| `modify_current_member` | `guildId`, `nick?`, `avatar?`, `banner?`, `bio?` | Modify the bot's own member profile in a guild (nickname, guild avatar/banner/bio). |
+
+### Voice
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `modify_voice_state` | `guildId`, `userId` (`@me` for the bot), `channelId?`, `suppress?`, `requestToSpeak?` | Modify a stage-channel voice state: move a user, suppress them, or request to speak. |
+
+> Voice tools target stage channels. Joining a voice channel and streaming audio needs the Voice
+> Gateway (UDP/Opus), which Crow does not implement; hearing users and the soundboard are not
+> bot-accessible Discord features.
 
 ### Reactions
 | Tool | Inputs | Purpose |
@@ -212,6 +223,11 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `modify_onboarding` | `guildId`, `enabled?`, `mode?`, `prompts?`, `defaultChannels?` | Modify a guild's onboarding. |
 | `get_member_verification` | `guildId` | Get a guild's membership screening. |
 | `modify_member_verification` | `guildId`, `enabled?`, `description?`, `formFields?` | Modify a guild's membership screening. |
+
+### Boost
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `get_boost_info` | `guildId` | Get a guild's Server Boost level, boost count, and progress bar state. |
 
 ### Actions
 | Tool | Inputs | Purpose |
@@ -256,4 +272,6 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `dms` | done | List, send, and read direct messages. |
 | `self` | done | Read and modify the bot's own profile. |
 | `community` | done | Manage the welcome screen, onboarding, and membership screening. |
+| `boost` | done | Read a guild's Server Boost info. |
+| `voice` | done | Modify stage-channel voice states. |
 | `interaction-values` | done | Capture and substitute submitted select/modal values. |

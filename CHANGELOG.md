@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0] - 2026-09-18
+### Added
+- Boost info: `get_boost_info` (premium tier and level name, boost count, progress bar state).
+- Voice state: `modify_voice_state` for stage channels (move a user, suppress them, or request to speak, with `@me` supported for the bot).
+- Per-guild self profile: `modify_current_member` (nickname, guild avatar, guild banner, and guild bio).
+### Changed
+- `modify_current_user` and `modify_current_member` share one image-to-data-URI helper, so avatar/banner uploads behave identically.
+- Marked the release stable: the `1.0.0` release is no longer published as a prerelease.
+
 ## [0.11.0] - 2026-09-15
 ### Added
 - Interaction values: the gateway logs recent component and modal interactions (including selected values and typed inputs) and exposes them via `list_recent_interactions`; reply content and embeds support `{values}`, `{values.N}`, and `{input.<customId>}` placeholders.
