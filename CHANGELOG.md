@@ -3,7 +3,7 @@
 ## [1.0.0] - 2026-09-18
 ### Added
 - Boost info: `get_boost_info` (premium tier and level name, boost count, progress bar state).
-- Voice state: `modify_voice_state` for stage channels (move a user, suppress them, or request to speak, with `@me` supported for the bot).
+- Voice state: `get_voice_state` and `modify_voice_state` for stage channels (read, move, suppress, or request to speak, with `@me` supported for the bot). `requestToSpeak` is accepted only for `@me`, matching the Discord API.
 - Per-guild self profile: `modify_current_member` (nickname, guild avatar, guild banner, and guild bio).
 ### Changed
 - `modify_current_user` and `modify_current_member` share one image-to-data-URI helper, so avatar/banner uploads behave identically.

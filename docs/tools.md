@@ -195,7 +195,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 ### Voice
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
-| `modify_voice_state` | `guildId`, `userId` (`@me` for the bot), `channelId?`, `suppress?`, `requestToSpeak?` | Modify a stage-channel voice state: move a user, suppress them, or request to speak. |
+| `get_voice_state` | `guildId`, `userId` (`@me` for the bot) | Get a user's current voice state (channel, mute/deafen, streaming, stage suppression). |
+| `modify_voice_state` | `guildId`, `userId` (`@me` for the bot), `channelId?`, `suppress?`, `requestToSpeak?` | Modify a stage-channel voice state: move a user, suppress them, or request to speak (requestToSpeak is `@me`-only). |
 
 > Voice tools target stage channels. Joining a voice channel and streaming audio needs the Voice
 > Gateway (UDP/Opus), which Crow does not implement; hearing users and the soundboard are not

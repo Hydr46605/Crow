@@ -42,7 +42,7 @@ and registering it.
 - **Roles**: create, modify, and delete roles; assign and remove them from members.
 - **Members**: edit nicknames, voice state, and timeouts.
 - **Self**: read and modify the bot's own profile (username, avatar, banner, bio) and its per-guild member profile (nickname, guild avatar/banner/bio).
-- **Voice**: modify stage-channel voice states (suppress, request-to-speak, and move between stage channels).
+- **Voice**: read and modify stage-channel voice states (suppress, request-to-speak, and move between stage channels).
 - **Reactions**: add, remove, and list message reactions.
 - **Audit**: read the guild audit log.
 - **Community**: manage the welcome screen, onboarding, and membership screening.
@@ -79,7 +79,7 @@ permission the tools safely.
 | Roles | `list_roles`, `create_role`, `modify_role`, `delete_role` |
 | Members | `modify_member`, `add_role_to_member`, `remove_role_from_member` |
 | Self | `get_current_user`, `modify_current_user`, `modify_current_member` |
-| Voice | `modify_voice_state` |
+| Voice | `get_voice_state`, `modify_voice_state` |
 | Reactions | `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, `list_reactions` |
 | Audit | `list_audit_log_entries` |
 | Community | `get_welcome_screen`, `modify_welcome_screen`, `get_onboarding`, `modify_onboarding`, `get_member_verification`, `modify_member_verification` |
