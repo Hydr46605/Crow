@@ -2,9 +2,9 @@
   <img src="assets/crow-logo.png" alt="Crow logo" width="180" />
 </p>
 
-# Crow
+<h1 align="center">Crow</h1>
 
-A Discord toolkit for AI agents.
+*A Discord toolkit for AI agents.*
 
 Crow is an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server built on the
 [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk). It gives AI
