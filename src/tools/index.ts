@@ -13,6 +13,8 @@ import { registerInviteTools } from './invites.js';
 import { registerMemberTools } from './members.js';
 import { registerMessageTools } from './messages.js';
 import { registerModerationTools } from './moderation.js';
+import { registerNoteTools } from './notes.js';
+import { registerOverviewTools } from './overview.js';
 import { registerPingTool } from './ping.js';
 import { registerProfileTools } from './profile.js';
 import { registerRawTool } from './raw.js';
@@ -32,6 +34,7 @@ export type ToolRegistrar = (server: McpServer, ctx: CrowContext) => void;
 const registrars: readonly ToolRegistrar[] = [
   registerPingTool,
   registerGuildTools,
+  registerOverviewTools,
   registerMemberTools,
   registerMessageTools,
   registerChannelTools,
@@ -50,6 +53,7 @@ const registrars: readonly ToolRegistrar[] = [
   registerStickerTools,
   registerVoiceTools,
   registerActionTools,
+  registerNoteTools,
   registerRawTool,
 ];
 
