@@ -115,12 +115,22 @@ jobs:
         run: |
           git add -A
           git commit -m "release: v${{ steps.version.outputs.version }}" || echo "Nothing to commit"
-          git tag "v${{ steps.version.outputs.version }}" --force
+          git tag "v${{ steps.version.outputs.version }}"
 
       - name: Push
         run: |
-          git push || true
-          git push --tags --force
+          git push origin main
+          git push --tags
+
+      - name: Verify remote
+        run: |
+          EXPECTED=$(git rev-parse HEAD)
+          ACTUAL=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Remote main ($ACTUAL) does not match local HEAD ($EXPECTED)" >&2
+            exit 1
+          fi
+          echo "Remote main verified: $ACTUAL"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
