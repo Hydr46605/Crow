@@ -110,6 +110,61 @@ export const normalizeColor = (color: number | string): number =>
   typeof color === 'number' ? color : parseInt(color.replace('#', ''), 16);
 
 /** Converts a friendly embed to Discord's exact snake_case JSON. */
+/** A raw Discord embed as returned by the API (snake_case, rich shape). */
+export interface RawEmbed {
+  readonly type?: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly url?: string;
+  readonly color?: number;
+  readonly timestamp?: string;
+  readonly author?: { readonly name: string; readonly url?: string; readonly icon_url?: string };
+  readonly footer?: { readonly text: string; readonly icon_url?: string };
+  readonly image?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly thumbnail?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly video?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly provider?: { readonly name?: string; readonly url?: string };
+  readonly fields?: readonly { readonly name: string; readonly value: string; readonly inline?: boolean }[];
+}
+
+/** A friendly camelCase embed summary, matching the shape agents pass to `create_embed`. */
+export interface EmbedSummary {
+  readonly type?: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly url?: string;
+  readonly color?: number;
+  readonly timestamp?: string;
+  readonly author?: { readonly name: string; readonly url?: string; readonly iconUrl?: string };
+  readonly footer?: { readonly text: string; readonly iconUrl?: string };
+  readonly image?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly thumbnail?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly video?: { readonly url: string; readonly width?: number; readonly height?: number };
+  readonly provider?: { readonly name?: string; readonly url?: string };
+  readonly fields?: readonly { readonly name: string; readonly value: string; readonly inline?: boolean }[];
+}
+
+/** Converts a raw Discord embed (as read from the API) to a friendly summary shape. */
+export const summarizeEmbed = (embed: RawEmbed): EmbedSummary => ({
+  type: embed.type,
+  title: embed.title,
+  description: embed.description,
+  url: embed.url,
+  color: embed.color,
+  timestamp: embed.timestamp,
+  author: embed.author
+    ? { name: embed.author.name, url: embed.author.url, iconUrl: embed.author.icon_url }
+    : undefined,
+  footer: embed.footer
+    ? { text: embed.footer.text, iconUrl: embed.footer.icon_url }
+    : undefined,
+  image: embed.image,
+  thumbnail: embed.thumbnail,
+  video: embed.video,
+  provider: embed.provider,
+  fields: embed.fields,
+});
+
 export const normalizeEmbed = (embed: EmbedInput): DiscordEmbed => {
   const result: DiscordEmbed = {};
   if (embed.title !== undefined) result.title = embed.title;

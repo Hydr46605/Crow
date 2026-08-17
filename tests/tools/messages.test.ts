@@ -7,6 +7,7 @@ import {
   editMessage,
   pinMessage,
   readMessages,
+  readMessagesInput,
   sendMessage,
   summarizeMessage,
   unpinMessage,
@@ -23,7 +24,7 @@ const rawMessage = {
 
 describe('summarizeMessage', () => {
   it('maps a raw message to a compact summary', () => {
-    expect(summarizeMessage(rawMessage)).toEqual({
+    expect(summarizeMessage(rawMessage)).toMatchObject({
       id: '1',
       channelId: '123456789012345678',
       authorId: '999',
@@ -31,6 +32,72 @@ describe('summarizeMessage', () => {
       content: 'hello',
       createdAt: '2026-08-16T00:00:00.000Z',
     });
+  });
+
+  it('includes embeds, components, attachments, stickers, and reactions', () => {
+    const summary = summarizeMessage({
+      ...rawMessage,
+      content: '',
+      type: 8,
+      flags: 128,
+      pinned: true,
+      tts: false,
+      edited_timestamp: '2026-08-16T01:00:00.000Z',
+      embeds: [
+        { type: 'rich', title: 'T', description: 'D', fields: [{ name: 'K', value: 'V', inline: true }] },
+      ],
+      components: [{ type: 1, components: [{ type: 2, custom_id: 'b', label: 'Go' }] }],
+      attachments: [
+        {
+          id: 'a1',
+          filename: 'pic.png',
+          size: 10,
+          url: 'https://cdn/u',
+          proxy_url: 'https://cdn/p',
+          content_type: 'image/png',
+        },
+      ],
+      sticker_items: [{ id: 's1', name: 'sticker', format_type: 1 }],
+      reactions: [{ count: 2, me: true, emoji: { name: '👍' } }],
+      mention_everyone: false,
+      mention_roles: ['r1'],
+    });
+
+    expect(summary.embeds).toEqual([
+      { type: 'rich', title: 'T', description: 'D', fields: [{ name: 'K', value: 'V', inline: true }] },
+    ]);
+    expect(summary.components).toEqual([
+      { type: 1, components: [{ type: 2, custom_id: 'b', label: 'Go' }] },
+    ]);
+    expect(summary.attachments).toEqual([
+      {
+        id: 'a1',
+        filename: 'pic.png',
+        description: null,
+        contentType: 'image/png',
+        size: 10,
+        url: 'https://cdn/u',
+        proxyUrl: 'https://cdn/p',
+        width: null,
+        height: null,
+        ephemeral: false,
+      },
+    ]);
+    expect(summary.stickerItems).toEqual([{ id: 's1', name: 'sticker', formatType: 1 }]);
+    expect(summary.reactions).toEqual([{ count: 2, me: true, emoji: { id: null, name: '👍' } }]);
+    expect(summary.editedAt).toBe('2026-08-16T01:00:00.000Z');
+    expect(summary.pinned).toBe(true);
+    expect(summary.mentionRoles).toEqual(['r1']);
+  });
+
+  it('recursively summarizes a referenced message', () => {
+    const summary = summarizeMessage({
+      ...rawMessage,
+      referenced_message: { ...rawMessage, id: '2', content: 'reply target' },
+    });
+    expect(summary.referencedMessage).toEqual(
+      expect.objectContaining({ id: '2', content: 'reply target' }),
+    );
   });
 });
 
@@ -48,6 +115,58 @@ describe('buildMessageBody', () => {
       attachments: [{ id: 0, filename: 'a.txt', description: undefined }],
     });
     expect(files).toEqual([{ name: 'a.txt', data: Buffer.from('hello'), contentType: 'text/plain' }]);
+  });
+});
+
+describe('buildMessageBody with components V2', () => {
+  it('sets the Components V2 flag when layout components are used', async () => {
+    const { body } = await buildMessageBody({
+      components: [
+        { type: 'textDisplay', content: 'Hello **world**' },
+        { type: 'container', components: [{ type: 'textDisplay', content: 'inner' }] },
+      ],
+    });
+
+    expect(body.flags).toBe(32768);
+    expect(body.components).toEqual([
+      { type: 10, content: 'Hello **world**' },
+      { type: 17, accent_color: undefined, spoiler: undefined, components: [{ type: 10, content: 'inner' }] },
+    ]);
+  });
+
+  it('does not set the flag for V1 components', async () => {
+    const { body } = await buildMessageBody({
+      components: [
+        { type: 'actionRow', components: [{ type: 'button', style: 'primary', customId: 'b', label: 'Go' }] },
+      ],
+    });
+
+    expect(body.flags).toBeUndefined();
+  });
+});
+
+describe('readMessagesInput', () => {
+  it('rejects multiple pagination anchors', () => {
+    expect(
+      readMessagesInput.safeParse({
+        channelId: '123456789012345678',
+        before: '111111111111111111',
+        after: '222222222222222222',
+      }).success,
+    ).toBe(false);
+    expect(
+      readMessagesInput.safeParse({
+        channelId: '123456789012345678',
+        before: '111111111111111111',
+        around: '222222222222222222',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a single anchor', () => {
+    expect(
+      readMessagesInput.safeParse({ channelId: '123456789012345678', before: '111111111111111111' }).success,
+    ).toBe(true);
   });
 });
 

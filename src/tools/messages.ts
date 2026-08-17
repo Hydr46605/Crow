@@ -6,9 +6,22 @@ import type { DiscordFile } from '../discord/client.js';
 import { fileSourceShape, MAX_ATTACHMENT_BYTES, requireSingleFileSource, resolveFile } from '../files.js';
 import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
-import { componentsSchema, normalizeComponents, type ComponentsInput } from './components.js';
+import {
+  componentsSchema,
+  COMPONENTS_V2_FLAG,
+  isComponentsV2,
+  normalizeComponents,
+  type ComponentsInput,
+} from './components.js';
 import { requireConsent } from './consent.js';
-import { embedsSchema, normalizeEmbeds, type EmbedInput } from './embeds.js';
+import {
+  embedsSchema,
+  normalizeEmbeds,
+  summarizeEmbed,
+  type EmbedInput,
+  type EmbedSummary,
+  type RawEmbed,
+} from './embeds.js';
 import { errorResult, textResult } from './result.js';
 import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake, type AllowedMentionsInput } from './schemas.js';
 
@@ -24,19 +37,29 @@ export const attachmentsSchema = z
   .max(10)
   .describe('Up to 10 file attachments.');
 
-const readMessagesInput = {
-  channelId: snowflake.describe('The ID of the channel to read messages from.'),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .optional()
-    .describe('Maximum number of messages to return (1-100).'),
-  before: snowflake.optional().describe('Return messages before this message ID.'),
-  after: snowflake.optional().describe('Return messages after this message ID.'),
-  around: snowflake.optional().describe('Return messages around this message ID.'),
-};
+export const readMessagesInput = z
+  .object({
+    channelId: snowflake.describe('The ID of the channel to read messages from.'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Maximum number of messages to return (1-100).'),
+    before: snowflake.optional().describe('Return messages before this message ID.'),
+    after: snowflake.optional().describe('Return messages after this message ID.'),
+    around: snowflake.optional().describe('Return messages around this message ID.'),
+  })
+  .superRefine((args, ctx) => {
+    const anchors = [args.before, args.after, args.around].filter((value) => value !== undefined).length;
+    if (anchors > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide only one of "before", "after", or "around".',
+      });
+    }
+  });
 
 const sendMessageInput = z
   .object({
@@ -61,6 +84,12 @@ const sendMessageInput = z
         message: 'Provide "content", "embeds", "attachments", or a combination.',
       });
     }
+    if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Components V2 messages cannot include "content" or "embeds".',
+      });
+    }
   });
 
 const editMessageInput = z
@@ -82,6 +111,12 @@ const editMessageInput = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Provide at least one of "content", "embeds", "components", or "attachments".',
+      });
+    }
+    if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Components V2 messages cannot include "content" or "embeds".',
       });
     }
   });
@@ -140,12 +175,76 @@ export interface BulkDeleteMessagesArgs {
   readonly confirm?: true;
 }
 
+export interface RawAttachment {
+  readonly id: string;
+  readonly filename: string;
+  readonly description?: string | null;
+  readonly content_type?: string | null;
+  readonly size: number;
+  readonly url: string;
+  readonly proxy_url: string;
+  readonly width?: number | null;
+  readonly height?: number | null;
+  readonly ephemeral?: boolean;
+}
+
+export interface RawStickerItem {
+  readonly id: string;
+  readonly name: string;
+  readonly format_type: number;
+}
+
+export interface RawReaction {
+  readonly count: number;
+  readonly me: boolean;
+  readonly emoji: { readonly id?: string | null; readonly name?: string | null };
+}
+
 export interface RawMessage {
   readonly id: string;
   readonly channel_id: string;
   readonly author: { readonly id: string; readonly username: string };
   readonly content: string;
   readonly timestamp: string;
+  readonly type?: number;
+  readonly flags?: number;
+  readonly pinned?: boolean;
+  readonly tts?: boolean;
+  readonly edited_timestamp?: string | null;
+  readonly embeds?: readonly RawEmbed[];
+  readonly components?: readonly unknown[];
+  readonly attachments?: readonly RawAttachment[];
+  readonly sticker_items?: readonly RawStickerItem[];
+  readonly referenced_message?: RawMessage | null;
+  readonly reactions?: readonly RawReaction[];
+  readonly mention_everyone?: boolean;
+  readonly mention_roles?: readonly string[];
+  readonly mention_users?: readonly string[];
+}
+
+export interface AttachmentSummary {
+  readonly id: string;
+  readonly filename: string;
+  readonly description: string | null;
+  readonly contentType: string | null;
+  readonly size: number;
+  readonly url: string;
+  readonly proxyUrl: string;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly ephemeral: boolean;
+}
+
+export interface StickerItemSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly formatType: number;
+}
+
+export interface ReactionSummary {
+  readonly count: number;
+  readonly me: boolean;
+  readonly emoji: { readonly id: string | null; readonly name: string | null };
 }
 
 export interface MessageSummary {
@@ -155,6 +254,20 @@ export interface MessageSummary {
   readonly authorUsername: string;
   readonly content: string;
   readonly createdAt: string;
+  readonly type?: number;
+  readonly flags?: number;
+  readonly pinned?: boolean;
+  readonly tts?: boolean;
+  readonly editedAt?: string | null;
+  readonly embeds?: readonly EmbedSummary[];
+  readonly components?: readonly unknown[];
+  readonly attachments?: readonly AttachmentSummary[];
+  readonly stickerItems?: readonly StickerItemSummary[];
+  readonly referencedMessage?: MessageSummary | null;
+  readonly reactions?: readonly ReactionSummary[];
+  readonly mentionEveryone?: boolean;
+  readonly mentionRoles?: readonly string[];
+  readonly mentionUsers?: readonly string[];
 }
 
 export const summarizeMessage = (message: RawMessage): MessageSummary => ({
@@ -164,6 +277,39 @@ export const summarizeMessage = (message: RawMessage): MessageSummary => ({
   authorUsername: message.author.username,
   content: message.content,
   createdAt: message.timestamp,
+  type: message.type,
+  flags: message.flags,
+  pinned: message.pinned,
+  tts: message.tts,
+  editedAt: message.edited_timestamp ?? null,
+  embeds: message.embeds?.map(summarizeEmbed),
+  components: message.components,
+  attachments: message.attachments?.map((attachment) => ({
+    id: attachment.id,
+    filename: attachment.filename,
+    description: attachment.description ?? null,
+    contentType: attachment.content_type ?? null,
+    size: attachment.size,
+    url: attachment.url,
+    proxyUrl: attachment.proxy_url,
+    width: attachment.width ?? null,
+    height: attachment.height ?? null,
+    ephemeral: attachment.ephemeral ?? false,
+  })),
+  stickerItems: message.sticker_items?.map((sticker) => ({
+    id: sticker.id,
+    name: sticker.name,
+    formatType: sticker.format_type,
+  })),
+  referencedMessage: message.referenced_message ? summarizeMessage(message.referenced_message) : null,
+  reactions: message.reactions?.map((reaction) => ({
+    count: reaction.count,
+    me: reaction.me,
+    emoji: { id: reaction.emoji.id ?? null, name: reaction.emoji.name ?? null },
+  })),
+  mentionEveryone: message.mention_everyone,
+  mentionRoles: message.mention_roles,
+  mentionUsers: message.mention_users,
 });
 
 const resolveAttachments = async (
@@ -220,7 +366,10 @@ export const buildMessageBody = async (
   const body: Record<string, unknown> = {};
   if (args.content !== undefined) body.content = args.content;
   if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-  if (args.components) body.components = normalizeComponents(args.components);
+  if (args.components) {
+    body.components = normalizeComponents(args.components);
+    if (isComponentsV2(args.components)) body.flags = COMPONENTS_V2_FLAG;
+  }
   if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
   if (args.tts !== undefined) body.tts = args.tts;
   if (args.replyTo) body.message_reference = { message_id: args.replyTo };
