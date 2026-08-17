@@ -46,6 +46,15 @@ can check limits before sending.
 local path, a URL, or inline base64/data-URI data.
 
 Components (buttons, string/user/role/mentionable/channel select menus) can be attached to messages.
+Components V2 layout is also supported: containers, sections, text display, separators, media
+galleries, thumbnails, and file components. When any V2 layout component is present, Crow sets the
+`IS_COMPONENTS_V2` message flag and sends the layout JSON; V2 messages cannot also carry top-level
+`content` or `embeds`, so Crow rejects that combination. V1 action rows keep working unchanged.
+
+`read_messages` and `read_dm_messages` return full message summaries: embeds, components (V1 and
+V2), attachments, stickers, reactions, referenced messages, flags, and mentions, so classic embeds
+and interactive messages are no longer lost.
+
 Run `crow gateway` to connect to the Gateway and receive the resulting interactions live: the actions
 runtime maps a component's `custom_id` to a reply or a modal, and Crow answers with the matching
 callback. Modal actions open a form (up to 5 text inputs) and reply when it is submitted. The
@@ -124,8 +133,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `modify_channel` | `channelId`, `name?`, `topic?`, `nsfw?`, `slowmodeSeconds?`, `position?`, `bitrate?`, `userLimit?`, `rtcRegion?`, `videoQualityMode?`, `defaultAutoArchiveDuration?`, `defaultThreadRateLimitPerUser?`, `availableTags?`, `defaultReactionEmoji?`, `defaultSortOrder?`, `defaultForumLayout?`, `permissionOverwrites?` | Modify a channel (text, voice, forum, overwrites). |
 | `create_channel` | `guildId`, `name`, `type?`, plus the voice/forum/overwrite fields above | Create a channel. |
 | `delete_channel` | `channelId`, `confirm` | Delete a channel (consent-gated). |
-| `list_active_threads` | `channelId` | List a channel's active threads. |
-| `list_archived_threads` | `channelId` | List a channel's archived public threads (forum posts). |
+| `list_active_threads` | `guildId`, `channelId?` | List a guild's active threads (public and private), optionally filtered to one channel. |
+| `list_archived_threads` | `channelId`, `before?`, `limit?` | List a channel's archived public threads (forum posts), paginated. |
 | `create_thread` | `channelId`, `name`, `messageId?`, `type?`, `autoArchiveDuration?`, `rateLimitPerUser?`, `message?`, `appliedTags?` | Create a thread, start one from a message, or create a forum post. |
 | `modify_thread` | `threadId`, `name?`, `archived?`, `locked?`, `autoArchiveDuration?`, `rateLimitPerUser?`, `appliedTags?` | Modify a thread. |
 | `edit_channel_permissions` | `channelId`, `overwriteId`, `type`, `allow?`, `deny?` | Set a role/member permission overwrite (named permissions). |
@@ -273,7 +282,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | Module | Status | Purpose |
 | --- | --- | --- |
 | `embeds` | done | Create rich embeds. |
-| `components` | send-only | Build messages with buttons and select menus. |
+| `components` | done | Build messages with buttons, select menus, and Components V2 layout. |
 | `webhooks` | done | Manage and execute webhooks. |
 | `attachments` | done | Send files, images, and GIFs on messages. |
 | `invites` | done | Manage invites and vanity URLs. |

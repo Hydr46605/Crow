@@ -35,10 +35,10 @@ and registering it.
 - **Discovery**: list guilds, members, channels, and bans so the agent can select its target.
 - **Overview**: `get_guild_overview` gives a one-call orientation of a guild (basics + boost info, channels grouped by category, and roles).
 - **Notes**: attach local, informational notes to users, roles, channels, messages, guilds, webhooks, and more, so context survives across agent sessions.
-- **Messaging**: read, send, edit, delete, pin, and bulk-delete messages.
+- **Messaging**: read (with embeds, components, and attachments), send, edit, delete, pin, and bulk-delete messages.
 - **Direct messages**: list DM channels, send DMs, and read DM history with content, embeds, components, and attachments.
 - **Embeds**: build rich embeds with Discord's limits enforced.
-- **Components**: send messages with buttons and select menus.
+- **Components**: send messages with buttons, select menus, and Components V2 layout (containers, sections, text, media galleries, thumbnails, separators, files).
 - **Channels**: full control: text/voice/forum settings, threads, forum posts, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Roles**: create, modify, and delete roles; assign and remove them from members.

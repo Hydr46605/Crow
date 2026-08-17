@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-08-17
+### Added
+- Message Components V2: messages can now be sent and read back with layout components (container, section, text display, separator, media gallery, thumbnail, and file). V2 layout is detected automatically and tagged with the `IS_COMPONENTS_V2` flag; V1 action rows and select menus keep working unchanged.
+- `read_messages` and `read_dm_messages` summaries now include embeds, components (V1 and V2), attachments, stickers, reactions, referenced messages, flags, and mentions, so classic embeds and interactive messages are no longer lost.
+### Fixed
+- `list_active_threads` now calls the guild-level List Active Guild Threads endpoint (`GET /guilds/{id}/threads/active`) instead of the channel-level route, which was removed in API v10 and returned 404 for every channel; `channelId` is now an optional filter.
+- `list_archived_threads` accepts `before`/`limit` pagination and reports `hasMore`.
+- `get_voice_state` returns a friendly message when the user is not connected to voice instead of a raw 404.
+- `read_messages` and `read_dm_messages` reject combining `before`, `after`, and `around`.
+- `get_webhook` no longer claims to return a token on ID lookup.
+- `execute_webhook` now sends `with_components=true` (components were previously ignored by Discord) and sets the V2 flag for layout components.
+### Changed
+- The release workflow pushes without force and verifies the remote tip after pushing.
+
 ## [1.1.0] - 2026-09-21
 ### Added
 - Notes: `add_note`, `list_notes`, `remove_note`, and `clear_notes` attach local, informational notes to Discord objects (users, members, roles, channels, threads, messages, guilds, webhooks, emojis, stickers, invites, or any custom type) so context survives across agents and sessions. Notes live in `~/.crow/notes.json` and are never sent to Discord; a note with a `key` is upserted instead of duplicated.
