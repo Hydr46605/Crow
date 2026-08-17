@@ -158,7 +158,26 @@ const deleteChannelInput = {
 };
 
 const listActiveThreadsInput = {
-  channelId: snowflake.describe('The ID of the channel to list active threads for.'),
+  guildId: snowflake.describe('The ID of the guild whose active threads to list.'),
+  channelId: snowflake
+    .optional()
+    .describe('Only return threads in this channel (forum, text, or announcement).'),
+};
+
+const listArchivedThreadsInput = {
+  channelId: snowflake.describe('The ID of the channel (forum or text) whose archived threads to list.'),
+  before: z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .describe('Return threads archived before this ISO-8601 timestamp.'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Maximum number of threads to return (1-100).'),
 };
 
 const forumMessageSchema = z
@@ -247,7 +266,14 @@ export interface DeleteChannelArgs {
   readonly confirm?: true;
 }
 export interface ListActiveThreadsArgs {
+  readonly guildId: string;
+  readonly channelId?: string;
+}
+
+export interface ListArchivedThreadsArgs {
   readonly channelId: string;
+  readonly before?: string;
+  readonly limit?: number;
 }
 export type CreateThreadArgs = z.infer<z.ZodObject<typeof createThreadInput>>;
 export type ModifyThreadArgs = z.infer<z.ZodObject<typeof modifyThreadInput>>;
@@ -331,6 +357,73 @@ export const summarizeChannel = (channel: RawChannel): ChannelSummary => ({
     allow: formatPermissions(ow.allow),
     deny: formatPermissions(ow.deny),
   })),
+});
+
+interface RawThreadMetadata {
+  readonly archived: boolean;
+  readonly locked?: boolean;
+  readonly auto_archive_duration?: number;
+  readonly archive_timestamp?: string;
+  readonly create_timestamp?: string | null;
+}
+
+interface RawThread {
+  readonly id: string;
+  readonly name: string;
+  readonly type: number;
+  readonly parent_id?: string | null;
+  readonly owner_id?: string;
+  readonly last_message_id?: string | null;
+  readonly rate_limit_per_user?: number;
+  readonly flags?: number;
+  readonly message_count?: number;
+  readonly member_count?: number;
+  readonly total_message_sent?: number;
+  readonly applied_tags?: readonly string[];
+  readonly thread_metadata?: RawThreadMetadata;
+}
+
+export interface ThreadSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly type: number;
+  readonly typeName?: ChannelType;
+  readonly parentId?: string | null;
+  readonly ownerId?: string;
+  readonly lastMessageId?: string | null;
+  readonly rateLimitPerUser?: number;
+  readonly flags?: number;
+  readonly messageCount?: number;
+  readonly memberCount?: number;
+  readonly totalMessageSent?: number;
+  readonly appliedTags?: readonly string[];
+  readonly archived?: boolean;
+  readonly locked?: boolean;
+  readonly autoArchiveDuration?: number;
+  readonly archiveTimestamp?: string;
+  readonly createTimestamp?: string | null;
+}
+
+/** Maps a thread channel object (active or archived) to a compact summary. */
+export const summarizeThread = (thread: RawThread): ThreadSummary => ({
+  id: thread.id,
+  name: thread.name,
+  type: thread.type,
+  typeName: channelTypeName(thread.type),
+  parentId: thread.parent_id,
+  ownerId: thread.owner_id,
+  lastMessageId: thread.last_message_id,
+  rateLimitPerUser: thread.rate_limit_per_user,
+  flags: thread.flags,
+  messageCount: thread.message_count,
+  memberCount: thread.member_count,
+  totalMessageSent: thread.total_message_sent,
+  appliedTags: thread.applied_tags,
+  archived: thread.thread_metadata?.archived,
+  locked: thread.thread_metadata?.locked,
+  autoArchiveDuration: thread.thread_metadata?.auto_archive_duration,
+  archiveTimestamp: thread.thread_metadata?.archive_timestamp,
+  createTimestamp: thread.thread_metadata?.create_timestamp ?? null,
 });
 
 const VIDEO_QUALITY_CODES = { auto: 1, full: 2 } as const;
@@ -469,13 +562,19 @@ export const listActiveThreads = async (
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
   const result = await attempt('list_active_threads', () =>
-    ctx.discord.request<{ readonly threads: RawChannel[] }>(
+    ctx.discord.request<{ readonly threads: RawThread[]; readonly members: readonly unknown[] }>(
       'GET',
-      `/channels/${args.channelId}/threads/active`,
+      `/guilds/${args.guildId}/threads/active`,
     ),
   );
   if (!result.ok) return errorResult(result.error);
-  return textResult(JSON.stringify(result.value.threads.map(summarizeChannel), null, 2));
+  const threads =
+    args.channelId === undefined
+      ? result.value.threads
+      : result.value.threads.filter((thread) => thread.parent_id === args.channelId);
+  return textResult(
+    JSON.stringify({ threads: threads.map(summarizeThread), members: result.value.members }, null, 2),
+  );
 };
 
 export const createThread = async (
@@ -514,17 +613,30 @@ export const createThread = async (
 };
 
 export const listArchivedThreads = async (
-  args: { readonly channelId: string },
+  args: ListArchivedThreadsArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
   const result = await attempt('list_archived_threads', () =>
-    ctx.discord.request<{ readonly threads: RawChannel[] }>(
-      'GET',
-      `/channels/${args.channelId}/threads/archived/public`,
-    ),
+    ctx.discord.request<{
+      readonly threads: RawThread[];
+      readonly members: readonly unknown[];
+      readonly has_more: boolean;
+    }>('GET', `/channels/${args.channelId}/threads/archived/public`, {
+      query: { before: args.before, limit: args.limit },
+    }),
   );
   if (!result.ok) return errorResult(result.error);
-  return textResult(JSON.stringify(result.value.threads.map(summarizeChannel), null, 2));
+  return textResult(
+    JSON.stringify(
+      {
+        threads: result.value.threads.map(summarizeThread),
+        members: result.value.members,
+        hasMore: result.value.has_more,
+      },
+      null,
+      2,
+    ),
+  );
 };
 
 export const modifyThread = async (
@@ -642,7 +754,9 @@ export const registerChannelTools = (server: McpServer, ctx: CrowContext): void 
     'list_active_threads',
     {
       title: 'List active threads',
-      description: 'List the active threads in a channel.',
+      description:
+        'List the active threads across a guild (public and private), optionally filtered to a ' +
+        'single channel. Use a forum channel to see its active posts.',
       inputSchema: listActiveThreadsInput,
       annotations: READ_ONLY,
     },
@@ -663,8 +777,9 @@ export const registerChannelTools = (server: McpServer, ctx: CrowContext): void 
     'list_archived_threads',
     {
       title: 'List archived threads',
-      description: 'List the archived public threads (forum posts) in a channel.',
-      inputSchema: { channelId: snowflake.describe('The ID of the forum channel.') },
+      description:
+        'List the archived public threads (forum posts) in a channel, with optional pagination.',
+      inputSchema: listArchivedThreadsInput,
       annotations: READ_ONLY,
     },
     async (args) => listArchivedThreads(args, ctx),

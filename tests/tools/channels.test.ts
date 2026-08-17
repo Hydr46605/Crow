@@ -13,6 +13,7 @@ import {
   modifyChannel,
   modifyThread,
   summarizeChannel,
+  summarizeThread,
 } from '../../src/tools/channels.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
@@ -208,17 +209,76 @@ describe('modifyChannel (voice, forum, overwrites)', () => {
 });
 
 describe('listActiveThreads', () => {
-  it('requests the active-threads route and returns thread summaries', async () => {
+  it('requests the guild active-threads route and returns thread summaries', async () => {
     let captured: RecordedRequest | undefined;
     const discord = new DiscordClient('token', async (m, r, o) => {
       captured = { m, r, o };
-      return { threads: [{ ...rawChannel, id: 't1', type: 11 }] };
+      return {
+        threads: [{ ...rawChannel, id: 't1', type: 11, thread_metadata: { archived: false } }],
+        members: [],
+      };
     });
 
-    const result = await listActiveThreads({ channelId: '1' }, createContext(discord));
+    const result = await listActiveThreads({ guildId: 'g' }, createContext(discord));
 
-    expect(captured?.r).toBe('/channels/1/threads/active');
+    expect(captured?.r).toBe('/guilds/g/threads/active');
     expect(textOf(result)).toContain('"id": "t1"');
+  });
+
+  it('filters threads to a single channel by parent id', async () => {
+    const discord = new DiscordClient('token', async () => ({
+      threads: [
+        { id: 't1', name: 'a', type: 11, parent_id: '1' },
+        { id: 't2', name: 'b', type: 11, parent_id: '2' },
+      ],
+      members: [],
+    }));
+
+    const result = await listActiveThreads({ guildId: 'g', channelId: '2' }, createContext(discord));
+    const text = textOf(result);
+
+    expect(text).toContain('"id": "t2"');
+    expect(text).not.toContain('"id": "t1"');
+  });
+});
+
+describe('summarizeThread', () => {
+  it('maps thread fields and metadata', () => {
+    const summary = summarizeThread({
+      id: 't1',
+      name: 'post',
+      type: 11,
+      parent_id: '1',
+      owner_id: '9',
+      message_count: 3,
+      member_count: 2,
+      total_message_sent: 4,
+      applied_tags: ['tag1'],
+      thread_metadata: {
+        archived: false,
+        locked: false,
+        auto_archive_duration: 1440,
+        archive_timestamp: '2026-08-16T00:00:00.000Z',
+        create_timestamp: '2026-08-15T00:00:00.000Z',
+      },
+    });
+
+    expect(summary).toMatchObject({
+      id: 't1',
+      name: 'post',
+      typeName: 'publicThread',
+      parentId: '1',
+      ownerId: '9',
+      messageCount: 3,
+      memberCount: 2,
+      totalMessageSent: 4,
+      appliedTags: ['tag1'],
+      archived: false,
+      locked: false,
+      autoArchiveDuration: 1440,
+      archiveTimestamp: '2026-08-16T00:00:00.000Z',
+      createTimestamp: '2026-08-15T00:00:00.000Z',
+    });
   });
 });
 
@@ -280,17 +340,22 @@ describe('createThread', () => {
 });
 
 describe('listArchivedThreads', () => {
-  it('requests the archived-public-threads route', async () => {
+  it('requests the archived-public-threads route with pagination', async () => {
     let captured: RecordedRequest | undefined;
     const discord = new DiscordClient('token', async (m, r, o) => {
       captured = { m, r, o };
-      return { threads: [{ ...rawChannel, id: 't1', type: 11 }] };
+      return { threads: [{ ...rawChannel, id: 't1', type: 11 }], members: [], has_more: false };
     });
 
-    const result = await listArchivedThreads({ channelId: '1' }, createContext(discord));
+    const result = await listArchivedThreads(
+      { channelId: '1', before: '2026-08-16T00:00:00.000Z', limit: 25 },
+      createContext(discord),
+    );
 
     expect(captured?.r).toBe('/channels/1/threads/archived/public');
-    expect(textOf(result)).toContain('"id": "t1"');
+    expect(captured?.o.query?.before).toBe('2026-08-16T00:00:00.000Z');
+    expect(captured?.o.query?.limit).toBe(25);
+    expect(textOf(result)).toContain('"hasMore": false');
   });
 });
 
