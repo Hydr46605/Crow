@@ -4,7 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
 import { IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
-import { componentsSchema } from './components.js';
+import { componentsSchema, isComponentsV2 } from './components.js';
 import { embedsSchema } from './embeds.js';
 import {
   attachmentsSchema,
@@ -32,10 +32,16 @@ const sendDmInput = z
     tts: z.boolean().optional().describe('Whether this is a text-to-speech message.'),
   })
   .superRefine((args, ctx) => {
-    if (!args.content && !args.embeds && !args.attachments) {
+    if (!args.content && !args.embeds && !args.components && !args.attachments) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide "content", "embeds", "attachments", or a combination.',
+        message: 'Provide "content", "embeds", "components", "attachments", or a combination.',
+      });
+    }
+    if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Components V2 messages cannot include "content" or "embeds".',
       });
     }
   });
@@ -100,6 +106,10 @@ const readDmMessagesInput = z
     }
     if (args.userId && args.channelId) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide only one of "userId" or "channelId".' });
+    }
+    const anchors = [args.before, args.after, args.around].filter((value) => value !== undefined).length;
+    if (anchors > 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide only one of "before", "after", or "around".' });
     }
   });
 

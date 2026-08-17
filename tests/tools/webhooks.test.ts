@@ -185,6 +185,29 @@ describe('executeWebhook', () => {
       },
     ]);
   });
+
+  it('sends with_components and the V2 flag for layout components', async () => {
+    let capturedOpts: { body?: Record<string, unknown>; query?: Record<string, unknown> } | undefined;
+    const discord = new DiscordClient('token', undefined, async (_id, _token, opts) => {
+      capturedOpts = opts;
+      return null;
+    });
+
+    await executeWebhook(
+      {
+        webhookId: 'w1',
+        webhookToken: 'tok',
+        components: [{ type: 'textDisplay', content: 'V2 content' }],
+      },
+      createContext(discord),
+    );
+
+    expect(capturedOpts?.query).toEqual({ wait: undefined, thread_id: undefined, with_components: true });
+    expect(capturedOpts?.body).toEqual({
+      components: [{ type: 10, content: 'V2 content' }],
+      flags: 32768,
+    });
+  });
 });
 
 describe('executeWebhookInput', () => {

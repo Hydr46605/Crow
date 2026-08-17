@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CHANNEL_TYPE_CODES, type ChannelType } from './channel-types.js';
+import { normalizeColor } from './embeds.js';
 import { snowflake } from './schemas.js';
 
 /** Discord button style numeric codes, keyed by friendly name. */
@@ -111,12 +112,140 @@ export const actionRowSchema = z.object({
   components: z.array(interactiveComponentSchema).min(1).max(5).describe('1-5 buttons or select menus.'),
 });
 
-/** A message's components: up to 5 action rows. */
+/* -------------------------------------------------------------------------- */
+/* Components V2 layout                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Markdown text block (Components V2, type 10). */
+export const textDisplaySchema = z.object({
+  type: z.literal('textDisplay'),
+  content: z
+    .string()
+    .min(1)
+    .max(4000)
+    .describe('Markdown text to display (up to 4000 characters).'),
+});
+
+/** Vertical spacing between components (Components V2, type 14). */
+export const separatorSchema = z.object({
+  type: z.literal('separator'),
+  spacing: z
+    .enum(['small', 'large'])
+    .optional()
+    .describe('Vertical spacing: small or large.'),
+  divider: z.boolean().optional().describe('Whether to draw a visible divider line.'),
+});
+
+/** A media item inside a media gallery. */
+const mediaItemSchema = z.object({
+  media: z.object({ url: z.string().url().describe('URL of the image or video.') }),
+  description: z.string().max(1024).optional().describe('Alt text or caption.'),
+  spoiler: z.boolean().optional().describe('Whether the media is spoiler-tagged.'),
+});
+
+/** A grid of images or videos (Components V2, type 12). */
+export const mediaGallerySchema = z.object({
+  type: z.literal('mediaGallery'),
+  items: z.array(mediaItemSchema).min(1).max(10).describe('Up to 10 media items.'),
+});
+
+/** A single attached-file display (Components V2, type 13). */
+export const fileComponentSchema = z.object({
+  type: z.literal('file'),
+  file: z
+    .object({ url: z.string().describe('Attachment URL (attachment://...).') })
+    .describe('The file to display.'),
+  spoiler: z.boolean().optional().describe('Whether the file is spoiler-tagged.'),
+});
+
+/** A small image used as a section accessory (Components V2, type 11). */
+export const thumbnailSchema = z.object({
+  type: z.literal('thumbnail'),
+  media: z.object({ url: z.string().url().describe('URL of the image.') }),
+  description: z.string().max(1024).optional().describe('Alt text (up to 1024 characters).'),
+});
+
+/** Text on the left with a thumbnail or button accessory (Components V2, type 9). */
+export const sectionSchema = z.object({
+  type: z.literal('section'),
+  components: z.array(textDisplaySchema).min(1).max(3).describe('1-3 text display blocks.'),
+  accessory: z
+    .discriminatedUnion('type', [thumbnailSchema, buttonSchema])
+    .optional()
+    .describe('A thumbnail or button shown on the right.'),
+});
+
+/** A styled wrapper grouping child components (Components V2, type 17). */
+export const containerSchema = z.object({
+  type: z.literal('container'),
+  accentColor: z
+    .union([
+      z.number().int().min(0).max(0xffffff),
+      z.string().regex(/^#?[0-9a-fA-F]{6}$/, 'hex color like #FFAA00'),
+    ])
+    .optional()
+    .describe('Accent color shown as a side bar (embed-style).'),
+  spoiler: z.boolean().optional().describe('Whether the container content is spoiler-tagged.'),
+  components: z
+    .array(
+      z.discriminatedUnion('type', [
+        actionRowSchema,
+        textDisplaySchema,
+        separatorSchema,
+        sectionSchema,
+        mediaGallerySchema,
+        fileComponentSchema,
+      ]),
+    )
+    .min(1)
+    .max(10)
+    .describe('1-10 child components.'),
+});
+
+/** A top-level message component (V1 action rows or V2 layout components). */
+export const topLevelComponentSchema = z.discriminatedUnion('type', [
+  actionRowSchema,
+  containerSchema,
+  textDisplaySchema,
+  separatorSchema,
+  mediaGallerySchema,
+  sectionSchema,
+  fileComponentSchema,
+]);
+
+/** Component types that only exist in Components V2. */
+const V2_LAYOUT_TYPES = new Set([
+  'container',
+  'section',
+  'textDisplay',
+  'separator',
+  'mediaGallery',
+  'thumbnail',
+  'file',
+]);
+
+/** Message flag marking a message as Components V2 (1 << 15). */
+export const COMPONENTS_V2_FLAG = 1 << 15;
+
+/** Whether any component in the list requires Components V2 rendering. */
+export const isComponentsV2 = (components: readonly { readonly type: string }[]): boolean =>
+  components.some((component) => V2_LAYOUT_TYPES.has(component.type));
+
+/** A message's components: V1 action rows or V2 layout components. */
 export const componentsSchema = z
-  .array(actionRowSchema)
+  .array(topLevelComponentSchema)
   .min(1)
-  .max(5)
-  .describe('Up to 5 action rows of buttons and select menus.');
+  .max(40)
+  .describe('Up to 40 components (V1 action rows or V2 layout components).')
+  .superRefine((components, ctx) => {
+    const v2 = components.some((component) => V2_LAYOUT_TYPES.has(component.type));
+    if (!v2 && components.length > 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'V1 messages allow at most 5 action rows; use Components V2 for more.',
+      });
+    }
+  });
 
 /** Discord text-input style numeric codes, keyed by friendly name. */
 export const TEXT_INPUT_STYLES = {
@@ -158,6 +287,14 @@ export type TextInputInput = z.infer<typeof textInputSchema>;
 export type SelectOptionInput = z.infer<typeof selectOptionSchema>;
 export type InteractiveComponentInput = z.infer<typeof interactiveComponentSchema>;
 export type ActionRowInput = z.infer<typeof actionRowSchema>;
+export type TextDisplayInput = z.infer<typeof textDisplaySchema>;
+export type SeparatorInput = z.infer<typeof separatorSchema>;
+export type MediaGalleryInput = z.infer<typeof mediaGallerySchema>;
+export type FileComponentInput = z.infer<typeof fileComponentSchema>;
+export type ThumbnailInput = z.infer<typeof thumbnailSchema>;
+export type SectionInput = z.infer<typeof sectionSchema>;
+export type ContainerInput = z.infer<typeof containerSchema>;
+export type TopLevelComponentInput = z.infer<typeof topLevelComponentSchema>;
 export type ComponentsInput = z.infer<typeof componentsSchema>;
 
 const normalizeEmoji = (emoji: EmojiInput): Record<string, unknown> => {
@@ -220,12 +357,58 @@ const normalizeInteractiveComponent = (component: InteractiveComponentInput): Re
   }
 };
 
-/** Converts friendly component input to Discord's exact numeric JSON. */
-export const normalizeComponents = (components: readonly ActionRowInput[]): Record<string, unknown>[] =>
-  components.map((row) => ({
-    type: 1,
-    components: row.components.map(normalizeInteractiveComponent),
-  }));
+/** Normalizes a section accessory (thumbnail or button) to numeric JSON. */
+const normalizeAccessory = (accessory: ThumbnailInput | ButtonInput): Record<string, unknown> => {
+  if (accessory.type === 'thumbnail') {
+    return { type: 11, media: { url: accessory.media.url }, description: accessory.description };
+  }
+  return normalizeInteractiveComponent(accessory);
+};
+
+/** Normalizes a single component (V1 or V2) to Discord's numeric JSON. */
+const normalizeComponent = (component: TopLevelComponentInput): Record<string, unknown> => {
+  switch (component.type) {
+    case 'actionRow':
+      return { type: 1, components: component.components.map(normalizeInteractiveComponent) };
+    case 'container':
+      return {
+        type: 17,
+        accent_color:
+          component.accentColor !== undefined ? normalizeColor(component.accentColor) : undefined,
+        spoiler: component.spoiler,
+        components: component.components.map(normalizeComponent),
+      };
+    case 'section':
+      return {
+        type: 9,
+        components: component.components.map(normalizeComponent),
+        accessory: component.accessory ? normalizeAccessory(component.accessory) : undefined,
+      };
+    case 'textDisplay':
+      return { type: 10, content: component.content };
+    case 'separator':
+      return { type: 14, spacing: component.spacing === 'large' ? 2 : 1, divider: component.divider };
+    case 'mediaGallery':
+      return {
+        type: 12,
+        items: component.items.map((item) => ({
+          media: { url: item.media.url },
+          description: item.description,
+          spoiler: item.spoiler,
+        })),
+      };
+    case 'file':
+      return { type: 13, file: { url: component.file.url }, spoiler: component.spoiler };
+    default: {
+      const never: never = component;
+      throw new Error(`Unsupported component type: ${never}`);
+    }
+  }
+};
+
+/** Converts friendly component input to Discord's exact numeric JSON (V1 or V2). */
+export const normalizeComponents = (components: readonly TopLevelComponentInput[]): Record<string, unknown>[] =>
+  components.map(normalizeComponent);
 
 /** Converts a friendly text input to Discord's numeric component JSON (type 4). */
 export const normalizeTextInput = (input: TextInputInput): Record<string, unknown> => ({

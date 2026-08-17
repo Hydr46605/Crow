@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  componentsSchema,
+  COMPONENTS_V2_FLAG,
   interactiveComponentSchema,
+  isComponentsV2,
   normalizeComponents,
   normalizeTextInputs,
   textInputSchema,
@@ -105,6 +108,123 @@ describe('normalizeComponents', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('normalizeComponents (V2)', () => {
+  it('normalizes a container with text display and a button action row', () => {
+    const input = [
+      {
+        type: 'container' as const,
+        accentColor: '#ff0000',
+        spoiler: false,
+        components: [
+          { type: 'textDisplay' as const, content: 'Hello **world**' },
+          { type: 'separator' as const, spacing: 'large' as const, divider: true },
+          {
+            type: 'actionRow' as const,
+            components: [
+              { type: 'button' as const, style: 'primary' as const, label: 'Go', customId: 'go' },
+            ],
+          },
+        ],
+      },
+    ];
+
+    expect(normalizeComponents(input)).toEqual([
+      {
+        type: 17,
+        accent_color: 0xff0000,
+        spoiler: false,
+        components: [
+          { type: 10, content: 'Hello **world**' },
+          { type: 14, spacing: 2, divider: true },
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 1,
+                label: 'Go',
+                custom_id: 'go',
+                url: undefined,
+                emoji: undefined,
+                disabled: undefined,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('normalizes a section with a thumbnail accessory', () => {
+    const input = [
+      {
+        type: 'section' as const,
+        components: [{ type: 'textDisplay' as const, content: 'Stats' }],
+        accessory: { type: 'thumbnail' as const, media: { url: 'https://example.com/i.png' } },
+      },
+    ];
+
+    expect(normalizeComponents(input)).toEqual([
+      {
+        type: 9,
+        components: [{ type: 10, content: 'Stats' }],
+        accessory: { type: 11, media: { url: 'https://example.com/i.png' }, description: undefined },
+      },
+    ]);
+  });
+
+  it('normalizes a media gallery and file component', () => {
+    const input = [
+      {
+        type: 'mediaGallery' as const,
+        items: [{ media: { url: 'https://example.com/a.png' }, description: 'alt' }],
+      },
+      { type: 'file' as const, file: { url: 'attachment://f.txt' }, spoiler: true },
+    ];
+
+    expect(normalizeComponents(input)).toEqual([
+      {
+        type: 12,
+        items: [{ media: { url: 'https://example.com/a.png' }, description: 'alt', spoiler: undefined }],
+      },
+      { type: 13, file: { url: 'attachment://f.txt' }, spoiler: true },
+    ]);
+  });
+});
+
+describe('isComponentsV2', () => {
+  it('detects V2 layout components', () => {
+    expect(isComponentsV2([{ type: 'textDisplay', content: 'x' }])).toBe(true);
+    expect(isComponentsV2([{ type: 'actionRow', components: [] }])).toBe(false);
+  });
+
+  it('exposes the Components V2 flag bit', () => {
+    expect(COMPONENTS_V2_FLAG).toBe(1 << 15);
+  });
+});
+
+describe('componentsSchema', () => {
+  it('rejects more than five action rows in V1 mode', () => {
+    const rows = Array.from({ length: 6 }, () => ({
+      type: 'actionRow' as const,
+      components: [
+        { type: 'button' as const, style: 'primary' as const, customId: 'x', label: 'x' },
+      ],
+    }));
+    expect(componentsSchema.safeParse(rows).success).toBe(false);
+  });
+
+  it('accepts a container with layout children', () => {
+    const result = componentsSchema.safeParse([
+      {
+        type: 'container',
+        components: [{ type: 'textDisplay', content: 'hi' }],
+      },
+    ]);
+    expect(result.success).toBe(true);
   });
 });
 

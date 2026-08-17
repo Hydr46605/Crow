@@ -4,7 +4,12 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { CrowContext } from '../context.js';
 import { DESTRUCTIVE, IDEMPOTENT, READ_ONLY } from './annotations.js';
 import { attempt } from './attempt.js';
-import { componentsSchema, normalizeComponents } from './components.js';
+import {
+  componentsSchema,
+  COMPONENTS_V2_FLAG,
+  isComponentsV2,
+  normalizeComponents,
+} from './components.js';
 import { requireConsent } from './consent.js';
 import { embedsSchema, normalizeEmbeds } from './embeds.js';
 import { errorResult, textResult } from './result.js';
@@ -61,6 +66,12 @@ export const executeWebhookInput = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Provide at least one of "content", "embeds", or "components".',
+      });
+    }
+    if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Components V2 messages cannot include "content" or "embeds".',
       });
     }
   });
@@ -194,10 +205,17 @@ export const executeWebhook = async (
   if (args.avatarUrl !== undefined) body.avatar_url = args.avatarUrl;
   if (args.tts !== undefined) body.tts = args.tts;
   if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-  if (args.components) body.components = normalizeComponents(args.components);
+  if (args.components) {
+    body.components = normalizeComponents(args.components);
+    if (isComponentsV2(args.components)) body.flags = COMPONENTS_V2_FLAG;
+  }
   if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
 
-  const query = { wait: args.wait, thread_id: args.threadId };
+  const query: Record<string, string | number | boolean | undefined> = {
+    wait: args.wait,
+    thread_id: args.threadId,
+  };
+  if (args.components) query.with_components = true;
 
   const result = await attempt('execute_webhook', () =>
     ctx.discord.executeWebhook<unknown>(args.webhookId, args.webhookToken, { body, query }),
@@ -223,7 +241,9 @@ export const registerWebhookTools = (server: McpServer, ctx: CrowContext): void 
     'get_webhook',
     {
       title: 'Get webhook',
-      description: 'Get a single webhook by ID, including its token for execution.',
+      description:
+        'Get a single webhook by ID. Note: the token is only included when listing a channel\'s ' +
+        'webhooks, not when fetching a webhook by ID.',
       inputSchema: getWebhookInput,
       annotations: READ_ONLY,
     },
