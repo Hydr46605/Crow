@@ -94,6 +94,7 @@ jobs:
           cat CHANGELOG_BODY.md
 
       - name: Update CHANGELOG.md
+        if: github.event_name == 'workflow_dispatch'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           DATE=$(date +%Y-%m-%d)
@@ -112,12 +113,14 @@ jobs:
           cat CHANGELOG.md
 
       - name: Commit and tag
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git add -A
           git commit -m "release: v${{ steps.version.outputs.version }}" || echo "Nothing to commit"
           git tag "v${{ steps.version.outputs.version }}"
 
       - name: Push
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git push origin main
           git push --tags
@@ -133,6 +136,7 @@ jobs:
           echo "Remote main verified: $ACTUAL"
 
       - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
