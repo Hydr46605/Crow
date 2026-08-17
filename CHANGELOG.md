@@ -14,14 +14,14 @@
 ### Changed
 - The release workflow pushes without force and verifies the remote tip after pushing.
 
-## [1.1.0] - 2026-09-21
+## [1.1.0] - 2026-08-16
 ### Added
 - Notes: `add_note`, `list_notes`, `remove_note`, and `clear_notes` attach local, informational notes to Discord objects (users, members, roles, channels, threads, messages, guilds, webhooks, emojis, stickers, invites, or any custom type) so context survives across agents and sessions. Notes live in `~/.crow/notes.json` and are never sent to Discord; a note with a `key` is upserted instead of duplicated.
 - Overview: `get_guild_overview` gives a one-call orientation of a guild (basics + boost info, channels grouped by category, and roles), reporting any unreadable section in `errors` instead of failing the whole call.
 ### Changed
 - `CrowContext` now carries a `notes` runtime alongside config, the Discord client, and the action runtime.
 
-## [1.0.0] - 2026-09-18
+## [1.0.0] - 2026-08-16
 ### Added
 - Boost info: `get_boost_info` (premium tier and level name, boost count, progress bar state).
 - Voice state: `get_voice_state` and `modify_voice_state` for stage channels (read, move, suppress, or request to speak, with `@me` supported for the bot). `requestToSpeak` is accepted only for `@me`, matching the Discord API.
@@ -30,7 +30,7 @@
 - `modify_current_user` and `modify_current_member` share one image-to-data-URI helper, so avatar/banner uploads behave identically.
 - Marked the release stable: the `1.0.0` release is no longer published as a prerelease.
 
-## [0.11.0] - 2026-09-15
+## [0.11.0] - 2026-08-15
 ### Added
 - Interaction values: the gateway logs recent component and modal interactions (including selected values and typed inputs) and exposes them via `list_recent_interactions`; reply content and embeds support `{values}`, `{values.N}`, and `{input.<customId>}` placeholders.
 - Community admin: `get_welcome_screen`, `modify_welcome_screen`, `get_onboarding`, `modify_onboarding`, `get_member_verification`, and `modify_member_verification`.
@@ -39,7 +39,7 @@
 - `parseInteraction` now extracts submitted values, modal inputs, user, and channel from gateway interactions.
 - `read_messages` and `read_dm_messages` share a single `fetchMessages` helper.
 
-## [0.10.0] - 2026-09-12
+## [0.10.0] - 2026-08-15
 ### Added
 - Direct messages: `list_dm_channels` and `send_dm` (resolves the DM channel, then sends content, embeds, components, and/or attachments).
 - Bot self-profile: `get_current_user` and `modify_current_user` (username, avatar, banner, and bio; avatar/banner accept a data URI or file source).
@@ -47,11 +47,11 @@
 ### Changed
 - `send_message`, `edit_message`, and `send_dm` now share a single `buildMessageBody` helper so their payloads stay identical.
 
-## [0.9.1] - 2026-09-09
+## [0.9.1] - 2026-08-15
 ### Fixed
 - Invite summaries now surface Discord's current invite fields (`inviteId`, `type`, `createdAt`, a top-level `guildId`, and the always-present `memberCount`/`onlineCount` from the community profile) instead of dropping them.
 
-## [0.9.0] - 2026-09-08
+## [0.9.0] - 2026-08-14
 ### Security
 - File downloads now accept `http(s)` URLs only and are capped to their size limit while streaming (no unbounded or non-HTTP fetches).
 - `SECURITY.md` now lists every consent-gated destructive tool and the secret-redaction guarantees.
@@ -62,7 +62,7 @@
 - The MCP server now advertises `instructions` describing the per-guild flow and consent model.
 - Added `docs/gateway.md` with a systemd example for running `crow gateway` persistently.
 
-## [0.8.0] - 2026-09-01
+## [0.8.0] - 2026-08-14
 ### Added
 - Roles: `list_roles`, `create_role`, `modify_role`, and `delete_role` (consent-gated), with named permissions and hex/int color support.
 - Member management: `modify_member` (nickname, voice mute/deafen/move, timeout), `add_role_to_member`, and `remove_role_from_member`.
@@ -73,7 +73,7 @@
 - `members.ts` and `messages.ts` now register the new member and message tools.
 - The consent and idempotent annotation lists now cover the new destructive and reversible writes.
 
-## [0.7.0] - 2026-08-24
+## [0.7.0] - 2026-08-13
 ### Added
 - `crow gateway` daemon that connects to the Discord Gateway (native WebSocket), identifies with the `GUILDS` intent, and dispatches live interactions with heartbeat ack-tracking, resume, and exponential-backoff reconnect.
 - Modal actions: `register_action` now accepts `kind: "modal"` to open a form (up to 5 text inputs) and reply on submit; `kind: "reply"` (the default) keeps the existing click-to-reply behavior.
@@ -82,7 +82,7 @@
 - `resolveInteraction` now reads the interaction type and returns either a channel-message or modal callback.
 - `Action` is a discriminated union; legacy registry entries without a `kind` load as replies.
 
-## [0.6.0] - 2026-08-16
+## [0.6.0] - 2026-08-13
 ### Added
 - Invites: `list_guild_invites`, `list_channel_invites`, `get_invite`, `get_vanity_url`, `create_invite`, and `delete_invite` (consent-gated), with invite code and URL normalization.
 - Emojis: `list_emojis`, `get_emoji`, `create_emoji` (data URI or file source), `modify_emoji`, and `delete_emoji` (consent-gated).
@@ -94,7 +94,7 @@
 - `DiscordClient` now supports multipart requests (`files` and `appendToFormData`).
 - `CrowContext` now carries the action runtime alongside config and the Discord client.
 
-## [0.5.0] - 2026-08-05
+## [0.5.0] - 2026-08-12
 ### Added
 - Embeds: `create_embed` plus `embeds` support on `send_message`, `edit_message`, and `execute_webhook`, with Discord's limits enforced.
 - Components (send-only): buttons (all 5 styles), string/user/role/mentionable/channel select menus, and action rows, attachable to messages and webhooks.
@@ -106,7 +106,7 @@
 - `modify_channel`/`create_channel` now support voice settings, forum settings, and permission overwrites.
 - `get_channel`/`list_channels` return type names, categories, and parsed permission overwrites.
 
-## [0.4.0] - 2026-07-22
+## [0.4.0] - 2026-08-11
 ### Added
 - `crow` CLI command (`serve`, `setup`, `doctor`, `--version`, `--help`).
 - Interactive setup wizard with live token verification, bot user ID auto-detection, and a privileged-intent check with a fix-and-recheck flow.
@@ -120,7 +120,7 @@
 - Discord request errors now carry their HTTP status code, enabling accurate 401 detection without exposing the token.
 - The bot token is captured with hidden input and stored in `~/.crow/.env` with `0600` permissions.
 
-## [0.3.0] - 2026-07-15
+## [0.3.0] - 2026-08-11
 ### Added
 - MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on every tool so agents can reason about safety.
 - Human-readable tool titles and per-field input descriptions surfaced through each tool's schema.
@@ -130,7 +130,7 @@
 ### Security
 - Read-only and destructive behavior is now machine-readable via annotations.
 
-## [0.2.0] - 2026-07-10
+## [0.2.0] - 2026-07-09
 ### Added
 - Moderation tools: `list_bans`, `get_ban`, `kick_member`, `ban_member`, and `unban_member`.
 - Channel tools: `list_channels`, `get_channel`, `modify_channel`, `create_channel`, and `delete_channel`.
