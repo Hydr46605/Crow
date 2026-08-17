@@ -83,7 +83,14 @@ export const getVoiceState = async (
       `/guilds/${args.guildId}/voice-states/${args.userId}`,
     ),
   );
-  if (!result.ok) return errorResult(result.error);
+  if (!result.ok) {
+    if (result.error.includes('Unknown Voice State')) {
+      return errorResult(
+        `User ${args.userId} is not connected to a voice channel in guild ${args.guildId}.`,
+      );
+    }
+    return errorResult(result.error);
+  }
   return textResult(JSON.stringify(summarizeVoiceState(result.value), null, 2));
 };
 
