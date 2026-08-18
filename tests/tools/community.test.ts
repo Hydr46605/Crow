@@ -7,6 +7,7 @@ import {
   modifyMemberVerification,
   modifyOnboarding,
   modifyWelcomeScreen,
+  modifyWelcomeScreenInput,
   summarizeMemberVerification,
   summarizeOnboarding,
   summarizeWelcomeScreen,
@@ -17,12 +18,10 @@ describe('welcome screen', () => {
   it('summarizes a raw welcome screen', () => {
     expect(
       summarizeWelcomeScreen({
-        enabled: true,
         description: 'hi',
         welcome_channels: [{ channel_id: 'c1', description: 'chat', emoji_id: null, emoji_name: '👋' }],
       }),
     ).toEqual({
-      enabled: true,
       description: 'hi',
       welcomeChannels: [{ channelId: 'c1', description: 'chat', emojiId: null, emojiName: '👋' }],
     });
@@ -32,10 +31,34 @@ describe('welcome screen', () => {
     let captured: RecordedRequest | undefined;
     const discord = new DiscordClient('token', async (m, r, o) => {
       captured = { m, r, o };
-      return { enabled: false };
+      return { description: null, welcome_channels: [] };
     });
     await getWelcomeScreen({ guildId: 'g1' }, createContext(discord));
     expect(captured?.r).toBe('/guilds/g1/welcome-screen');
+  });
+
+  it('reports a clear message when no welcome screen is configured', async () => {
+    const discord = new DiscordClient('token', async () => {
+      throw new Error('Unknown Guild Welcome Screen');
+    });
+
+    const result = await getWelcomeScreen({ guildId: 'g1' }, createContext(discord));
+
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('no welcome screen configured');
+  });
+
+  it('requires a welcome channel when enabling the screen', () => {
+    const result = modifyWelcomeScreenInput.safeParse({ guildId: 'g1', enabled: true });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a welcome channel with both an emoji id and name', () => {
+    const result = modifyWelcomeScreenInput.safeParse({
+      guildId: 'g1',
+      welcomeChannels: [{ channelId: 'c1', description: 'chat', emojiId: '1', emojiName: '👋' }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it('modifies the welcome screen body', async () => {

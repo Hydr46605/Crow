@@ -11,14 +11,23 @@ import { snowflake } from './schemas.js';
 /* Welcome screen                                                              */
 /* -------------------------------------------------------------------------- */
 
-const welcomeChannelSchema = z.object({
-  channelId: snowflake.describe('The ID of the welcome channel.'),
-  description: z.string().max(100).optional().describe('Short description shown under the channel.'),
-  emojiId: snowflake.optional().describe('Custom emoji ID for the channel.'),
-  emojiName: z.string().min(1).max(64).optional().describe('Unicode emoji character for the channel.'),
-});
+const welcomeChannelSchema = z
+  .object({
+    channelId: snowflake.describe('The ID of the welcome channel.'),
+    description: z.string().max(100).describe('Short description shown under the channel (required).'),
+    emojiId: snowflake.optional().describe('Custom emoji ID for the channel.'),
+    emojiName: z.string().min(1).max(64).optional().describe('Unicode emoji character for the channel.'),
+  })
+  .superRefine((channel, ctx) => {
+    if (channel.emojiId && channel.emojiName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide only one of "emojiId" or "emojiName".',
+      });
+    }
+  });
 
-const modifyWelcomeScreenInput = z
+export const modifyWelcomeScreenInput = z
   .object({
     guildId: snowflake.describe('The ID of the guild.'),
     enabled: z.boolean().optional().describe('Whether the welcome screen is enabled.'),
@@ -35,12 +44,17 @@ const modifyWelcomeScreenInput = z
         message: 'Provide at least one of "enabled", "description", or "welcomeChannels".',
       });
     }
+    if (args.enabled === true && (args.welcomeChannels === undefined || args.welcomeChannels.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Enabling the welcome screen requires at least one "welcomeChannels" entry.',
+      });
+    }
   });
 
 export type ModifyWelcomeScreenArgs = z.infer<typeof modifyWelcomeScreenInput>;
 
 interface RawWelcomeScreen {
-  readonly enabled?: boolean;
   readonly description?: string | null;
   readonly welcome_channels?: {
     readonly channel_id: string;
@@ -51,7 +65,6 @@ interface RawWelcomeScreen {
 }
 
 export const summarizeWelcomeScreen = (screen: RawWelcomeScreen): Record<string, unknown> => ({
-  enabled: screen.enabled,
   description: screen.description,
   welcomeChannels: (screen.welcome_channels ?? []).map((channel) => ({
     channelId: channel.channel_id,
@@ -68,7 +81,12 @@ export const getWelcomeScreen = async (
   const result = await attempt('get_welcome_screen', () =>
     ctx.discord.request<RawWelcomeScreen>('GET', `/guilds/${args.guildId}/welcome-screen`),
   );
-  if (!result.ok) return errorResult(result.error);
+  if (!result.ok) {
+    if (result.error.includes('Unknown Guild Welcome Screen')) {
+      return textResult(`Guild ${args.guildId} has no welcome screen configured.`);
+    }
+    return errorResult(result.error);
+  }
   return textResult(JSON.stringify(summarizeWelcomeScreen(result.value), null, 2));
 };
 
