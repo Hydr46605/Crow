@@ -2,12 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { DiscordClient } from '../../src/discord/client.js';
 import {
   addRoleToMember,
+  disconnectMemberFromVoice,
   getMember,
   listMembers,
   modifyMember,
   modifyMemberInput,
+  moveMemberToVoice,
   removeRoleFromMember,
+  removeTimeoutMember,
+  resetMemberNickname,
+  setMemberNickname,
   summarizeMember,
+  timeoutMember,
 } from '../../src/tools/members.js';
 import { createContext, textOf, type RecordedRequest } from '../helpers.js';
 
@@ -133,5 +139,66 @@ describe('member role assignment', () => {
     await removeRoleFromMember({ guildId: 'g', userId: 'u', roleId: 'r' }, createContext(discord));
     expect(captured?.method).toBe('DELETE');
     expect(captured?.route).toBe('/guilds/g/members/u/roles/r');
+  });
+});
+
+describe('dedicated member moderation tools', () => {
+  it('times out a member with a computed end time', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    const result = await timeoutMember(
+      { guildId: 'g', userId: 'u', durationMinutes: 10 },
+      createContext(discord),
+    );
+
+    expect(captured?.method).toBe('PATCH');
+    expect(captured?.route).toBe('/guilds/g/members/u');
+    expect(typeof captured?.options.body.communication_disabled_until).toBe('string');
+    expect(captured?.options.body.communication_disabled_until).toContain('T');
+    expect(textOf(result)).toContain('Timed out');
+  });
+
+  it('lifts a member timeout', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await removeTimeoutMember({ guildId: 'g', userId: 'u' }, createContext(discord));
+
+    expect(captured?.options.body).toEqual({ communication_disabled_until: null });
+  });
+
+  it('sets and resets a member nickname', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await setMemberNickname({ guildId: 'g', userId: 'u', nick: 'New' }, createContext(discord));
+    expect(captured?.options.body).toEqual({ nick: 'New' });
+
+    await resetMemberNickname({ guildId: 'g', userId: 'u' }, createContext(discord));
+    expect(captured?.options.body).toEqual({ nick: null });
+  });
+
+  it('disconnects and moves a member in voice', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (method, route, options) => {
+      captured = { method, route, options };
+      return null;
+    });
+
+    await disconnectMemberFromVoice({ guildId: 'g', userId: 'u' }, createContext(discord));
+    expect(captured?.options.body).toEqual({ channel_id: null });
+
+    await moveMemberToVoice({ guildId: 'g', userId: 'u', channelId: 'vc' }, createContext(discord));
+    expect(captured?.options.body).toEqual({ channel_id: 'vc' });
   });
 });

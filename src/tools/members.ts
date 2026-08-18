@@ -72,6 +72,50 @@ const removeRoleFromMemberInput = {
   roleId: snowflake.describe('The ID of the role to remove.'),
 };
 
+const timeoutMemberInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to time out.'),
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(40320)
+    .describe('How long to time out the member, in minutes (1-40320 = up to 4 weeks).'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const removeTimeoutMemberInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member whose timeout to lift.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const setMemberNicknameInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to nickname.'),
+  nick: z.string().min(1).max(32).describe('The new nickname (1-32 characters).'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const resetMemberNicknameInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member whose nickname to reset.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const disconnectMemberFromVoiceInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to disconnect from voice.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
+const moveMemberToVoiceInput = {
+  guildId: snowflake.describe('The ID of the guild the member belongs to.'),
+  userId: snowflake.describe('The ID of the member to move.'),
+  channelId: snowflake.describe('The voice channel to move the member to.'),
+  reason: z.string().max(512).optional().describe('Audit-log reason.'),
+};
+
 export interface ListMembersArgs {
   readonly guildId: string;
   readonly query?: string;
@@ -157,6 +201,45 @@ export interface MemberRoleArgs {
   readonly roleId: string;
 }
 
+export interface TimeoutMemberArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly durationMinutes: number;
+  readonly reason?: string;
+}
+
+export interface RemoveTimeoutMemberArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly reason?: string;
+}
+
+export interface SetMemberNicknameArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly nick: string;
+  readonly reason?: string;
+}
+
+export interface ResetMemberNicknameArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly reason?: string;
+}
+
+export interface DisconnectMemberFromVoiceArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly reason?: string;
+}
+
+export interface MoveMemberToVoiceArgs {
+  readonly guildId: string;
+  readonly userId: string;
+  readonly channelId: string;
+  readonly reason?: string;
+}
+
 export const modifyMember = async (
   args: ModifyMemberArgs,
   ctx: CrowContext,
@@ -206,6 +289,96 @@ export const removeRoleFromMember = async (
   return textResult(`Removed role ${args.roleId} from member ${args.userId}.`);
 };
 
+/** Shared PATCH helper for the dedicated member-moderation tools. */
+const patchMember = async (
+  label: string,
+  args: { readonly guildId: string; readonly userId: string; readonly reason?: string },
+  body: Record<string, unknown>,
+  success: string,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt(label, () =>
+    ctx.discord.request<unknown>('PATCH', `/guilds/${args.guildId}/members/${args.userId}`, {
+      body,
+      reason: args.reason,
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(success);
+};
+
+export const timeoutMember = async (
+  args: TimeoutMemberArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'timeout_member',
+    args,
+    { communication_disabled_until: new Date(Date.now() + args.durationMinutes * 60_000).toISOString() },
+    `Timed out member ${args.userId} in guild ${args.guildId} for ${args.durationMinutes} minutes.`,
+    ctx,
+  );
+
+export const removeTimeoutMember = async (
+  args: RemoveTimeoutMemberArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'remove_timeout_member',
+    args,
+    { communication_disabled_until: null },
+    `Lifted the timeout on member ${args.userId} in guild ${args.guildId}.`,
+    ctx,
+  );
+
+export const setMemberNickname = async (
+  args: SetMemberNicknameArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'set_member_nickname',
+    args,
+    { nick: args.nick },
+    `Set member ${args.userId}'s nickname in guild ${args.guildId}.`,
+    ctx,
+  );
+
+export const resetMemberNickname = async (
+  args: ResetMemberNicknameArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'reset_member_nickname',
+    args,
+    { nick: null },
+    `Reset member ${args.userId}'s nickname in guild ${args.guildId}.`,
+    ctx,
+  );
+
+export const disconnectMemberFromVoice = async (
+  args: DisconnectMemberFromVoiceArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'disconnect_member_from_voice',
+    args,
+    { channel_id: null },
+    `Disconnected member ${args.userId} from voice in guild ${args.guildId}.`,
+    ctx,
+  );
+
+export const moveMemberToVoice = async (
+  args: MoveMemberToVoiceArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> =>
+  patchMember(
+    'move_member_to_voice',
+    args,
+    { channel_id: args.channelId },
+    `Moved member ${args.userId} to voice channel ${args.channelId}.`,
+    ctx,
+  );
+
 export const registerMemberTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'list_members',
@@ -234,8 +407,10 @@ export const registerMemberTools = (server: McpServer, ctx: CrowContext): void =
     {
       title: 'Modify member',
       description:
-        'Modify a member: nickname, voice mute/deafen, voice channel, or a timeout. ' +
-        'Roles are managed via add_role_to_member and remove_role_from_member.',
+        'Generic member edit: nickname, voice mute/deafen, voice channel, or a timeout. ' +
+        'Prefer the dedicated tools (set_member_nickname, reset_member_nickname, move_member_to_voice, ' +
+        'disconnect_member_from_voice, timeout_member, remove_timeout_member); roles use ' +
+        'add_role_to_member and remove_role_from_member.',
       inputSchema: modifyMemberInput,
       annotations: IDEMPOTENT,
     },
@@ -260,5 +435,65 @@ export const registerMemberTools = (server: McpServer, ctx: CrowContext): void =
       annotations: IDEMPOTENT,
     },
     async (args) => removeRoleFromMember(args, ctx),
+  );
+  server.registerTool(
+    'timeout_member',
+    {
+      title: 'Timeout member',
+      description: 'Time out a member so they cannot send messages or speak for a number of minutes.',
+      inputSchema: timeoutMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => timeoutMember(args, ctx),
+  );
+  server.registerTool(
+    'remove_timeout_member',
+    {
+      title: 'Remove member timeout',
+      description: 'Lift a member\'s timeout early, restoring their ability to communicate.',
+      inputSchema: removeTimeoutMemberInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => removeTimeoutMember(args, ctx),
+  );
+  server.registerTool(
+    'set_member_nickname',
+    {
+      title: 'Set member nickname',
+      description: 'Set a guild member\'s nickname.',
+      inputSchema: setMemberNicknameInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => setMemberNickname(args, ctx),
+  );
+  server.registerTool(
+    'reset_member_nickname',
+    {
+      title: 'Reset member nickname',
+      description: 'Reset a guild member\'s nickname to their account username.',
+      inputSchema: resetMemberNicknameInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => resetMemberNickname(args, ctx),
+  );
+  server.registerTool(
+    'disconnect_member_from_voice',
+    {
+      title: 'Disconnect member from voice',
+      description: 'Disconnect a member from their voice channel.',
+      inputSchema: disconnectMemberFromVoiceInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => disconnectMemberFromVoice(args, ctx),
+  );
+  server.registerTool(
+    'move_member_to_voice',
+    {
+      title: 'Move member to voice',
+      description: 'Move a member to a different voice channel.',
+      inputSchema: moveMemberToVoiceInput,
+      annotations: IDEMPOTENT,
+    },
+    async (args) => moveMemberToVoice(args, ctx),
   );
 };

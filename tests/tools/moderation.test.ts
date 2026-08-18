@@ -4,6 +4,7 @@ import {
   banMember,
   deleteMessageSeconds,
   getBan,
+  getPruneCount,
   kickMember,
   listBans,
   summarizeBan,
@@ -108,6 +109,26 @@ describe('unbanMember', () => {
     expect(captured?.m).toBe('DELETE');
     expect(captured?.r).toBe('/guilds/g/bans/u');
     expect(textOf(result)).toContain('Unbanned');
+  });
+});
+
+describe('getPruneCount', () => {
+  it('requests the prune count route read-only', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return { pruned: 7 };
+    });
+
+    const result = await getPruneCount(
+      { guildId: 'g', days: 7, includeRoles: ['r1'] },
+      createContext(discord),
+    );
+
+    expect(captured?.r).toBe('/guilds/g/prune');
+    expect(captured?.o.query?.days).toBe(7);
+    expect(captured?.o.query?.include_roles).toBe('r1');
+    expect(textOf(result)).toContain('"pruned": 7');
   });
 });
 

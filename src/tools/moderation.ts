@@ -51,6 +51,21 @@ const unbanMemberInput = {
   reason: z.string().max(512).optional().describe('Audit-log reason for the unban.'),
 };
 
+const getPruneCountInput = {
+  guildId: snowflake.describe('The ID of the guild to count prunable members for.'),
+  days: z
+    .number()
+    .int()
+    .min(1)
+    .max(30)
+    .optional()
+    .describe('Number of days of inactivity (1-30, default 7).'),
+  includeRoles: z
+    .array(snowflake)
+    .optional()
+    .describe('Roles to include as prunable even if the member has other roles.'),
+};
+
 export interface ListBansArgs {
   readonly guildId: string;
   readonly limit?: number;
@@ -80,6 +95,12 @@ export interface UnbanMemberArgs {
   readonly guildId: string;
   readonly userId: string;
   readonly reason?: string;
+}
+
+export interface GetPruneCountArgs {
+  readonly guildId: string;
+  readonly days?: number;
+  readonly includeRoles?: readonly string[];
 }
 
 interface RawBan {
@@ -161,6 +182,20 @@ export const unbanMember = async (
   return textResult(`Unbanned user ${args.userId} from guild ${args.guildId}.`);
 };
 
+/** Counts members that would be pruned, without actually pruning them (read-only). */
+export const getPruneCount = async (
+  args: GetPruneCountArgs,
+  ctx: CrowContext,
+): Promise<CallToolResult> => {
+  const result = await attempt('get_prune_count', () =>
+    ctx.discord.request<{ readonly pruned: number }>('GET', `/guilds/${args.guildId}/prune`, {
+      query: { days: args.days, include_roles: args.includeRoles?.join(',') },
+    }),
+  );
+  if (!result.ok) return errorResult(result.error);
+  return textResult(JSON.stringify({ pruned: result.value.pruned }, null, 2));
+};
+
 export const registerModerationTools = (server: McpServer, ctx: CrowContext): void => {
   server.registerTool(
     'list_bans',
@@ -213,5 +248,17 @@ export const registerModerationTools = (server: McpServer, ctx: CrowContext): vo
       annotations: IDEMPOTENT,
     },
     async (args) => unbanMember(args, ctx),
+  );
+  server.registerTool(
+    'get_prune_count',
+    {
+      title: 'Get prune count',
+      description:
+        'Count the members that would be pruned after a number of inactive days. ' +
+        'Read-only: it does not actually prune anyone.',
+      inputSchema: getPruneCountInput,
+      annotations: READ_ONLY,
+    },
+    async (args) => getPruneCount(args, ctx),
   );
 };
