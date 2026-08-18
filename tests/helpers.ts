@@ -2,6 +2,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ActionRuntime } from '../src/actions/runtime.js';
+import { BlocklistRuntime } from '../src/blocklist/runtime.js';
+import { emptyBlocklist } from '../src/blocklist/types.js';
 import type { CrowContext } from '../src/context.js';
 import { NoteRuntime } from '../src/notes/runtime.js';
 import type {
@@ -26,6 +28,7 @@ export const createContext = (
   discord,
   actions: actions ?? new ActionRuntime(join(tmpdir(), 'crow-test-actions.json')),
   notes: notes ?? new NoteRuntime(join(tmpdir(), 'crow-test-notes.json')),
+  blocklist: new BlocklistRuntime(emptyBlocklist(), discord),
 });
 
 export const textOf = (result: CallToolResult): string => {

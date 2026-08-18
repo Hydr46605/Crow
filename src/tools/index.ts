@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { installBlocklistGuard } from '../blocklist/guard.js';
 import type { CrowContext } from '../context.js';
 import { registerActionTools } from './actions.js';
 import { registerAuditLogTools } from './audit-log.js';
@@ -58,6 +59,7 @@ const registrars: readonly ToolRegistrar[] = [
 ];
 
 export const registerTools = (server: McpServer, ctx: CrowContext): void => {
+  installBlocklistGuard(server, ctx);
   for (const register of registrars) {
     register(server, ctx);
   }

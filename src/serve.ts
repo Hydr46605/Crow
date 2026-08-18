@@ -1,5 +1,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ActionRuntime } from './actions/runtime.js';
+import { BlocklistRuntime } from './blocklist/runtime.js';
+import { loadBlocklist } from './blocklist/store.js';
 import { BOT_TOKEN_VAR, loadConfig } from './config.js';
 import { DiscordClient } from './discord/client.js';
 import { NoteRuntime } from './notes/runtime.js';
@@ -13,7 +15,8 @@ export const serve = async (): Promise<void> => {
   const actions = new ActionRuntime();
   actions.load();
   const notes = new NoteRuntime();
-  const server = createServer({ config, discord, actions, notes });
+  const blocklist = new BlocklistRuntime(loadBlocklist(), discord);
+  const server = createServer({ config, discord, actions, notes, blocklist });
 
   const shutdown = async (): Promise<void> => {
     await server.close();

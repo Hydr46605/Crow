@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ActionRuntime } from './actions/runtime.js';
+import type { BlocklistRuntime } from './blocklist/runtime.js';
 import type { CrowConfig } from './config.js';
 import type { CrowContext } from './context.js';
 import type { DiscordClient } from './discord/client.js';
@@ -12,6 +13,7 @@ export interface CreateServerOptions {
   readonly discord: DiscordClient;
   readonly actions: ActionRuntime;
   readonly notes: NoteRuntime;
+  readonly blocklist: BlocklistRuntime;
 }
 
 const INSTRUCTIONS = [
@@ -27,10 +29,10 @@ const INSTRUCTIONS = [
 ].join(' ');
 
 /** Builds a fully-wired MCP server with all tools registered. */
-export const createServer = ({ config, discord, actions, notes }: CreateServerOptions): McpServer => {
+export const createServer = ({ config, discord, actions, notes, blocklist }: CreateServerOptions): McpServer => {
   const server = new McpServer({ name: NAME, version: VERSION }, { instructions: INSTRUCTIONS });
 
-  const ctx: CrowContext = { config, discord, actions, notes };
+  const ctx: CrowContext = { config, discord, actions, notes, blocklist };
   registerTools(server, ctx);
 
   return server;
