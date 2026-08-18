@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CHANNEL_TYPE_CODES, type ChannelType } from './channel-types.js';
+import { CHANNEL_TYPE_CODES, channelTypeName, type ChannelType } from './channel-types.js';
 import { normalizeColor } from './embeds.js';
 import { snowflake } from './schemas.js';
 
@@ -163,6 +163,7 @@ export const thumbnailSchema = z.object({
   type: z.literal('thumbnail'),
   media: z.object({ url: z.string().url().describe('URL of the image.') }),
   description: z.string().max(1024).optional().describe('Alt text (up to 1024 characters).'),
+  spoiler: z.boolean().optional().describe('Whether the thumbnail is spoiler-tagged.'),
 });
 
 /** Text on the left with a thumbnail or button accessory (Components V2, type 9). */
@@ -360,7 +361,12 @@ const normalizeInteractiveComponent = (component: InteractiveComponentInput): Re
 /** Normalizes a section accessory (thumbnail or button) to numeric JSON. */
 const normalizeAccessory = (accessory: ThumbnailInput | ButtonInput): Record<string, unknown> => {
   if (accessory.type === 'thumbnail') {
-    return { type: 11, media: { url: accessory.media.url }, description: accessory.description };
+    return {
+      type: 11,
+      media: { url: accessory.media.url },
+      description: accessory.description,
+      spoiler: accessory.spoiler,
+    };
   }
   return normalizeInteractiveComponent(accessory);
 };
@@ -387,7 +393,11 @@ const normalizeComponent = (component: TopLevelComponentInput): Record<string, u
     case 'textDisplay':
       return { type: 10, content: component.content };
     case 'separator':
-      return { type: 14, spacing: component.spacing === 'large' ? 2 : 1, divider: component.divider };
+      return {
+        type: 14,
+        spacing: component.spacing === undefined ? undefined : component.spacing === 'large' ? 2 : 1,
+        divider: component.divider,
+      };
     case 'mediaGallery':
       return {
         type: 12,
@@ -409,6 +419,162 @@ const normalizeComponent = (component: TopLevelComponentInput): Record<string, u
 /** Converts friendly component input to Discord's exact numeric JSON (V1 or V2). */
 export const normalizeComponents = (components: readonly TopLevelComponentInput[]): Record<string, unknown>[] =>
   components.map(normalizeComponent);
+
+/* -------------------------------------------------------------------------- */
+/* Component decoding (reading)                                               */
+/* -------------------------------------------------------------------------- */
+
+const BUTTON_STYLE_NAMES: Record<number, string> = {
+  1: 'primary',
+  2: 'secondary',
+  3: 'success',
+  4: 'danger',
+  5: 'link',
+};
+
+const SELECT_TYPE_NAMES: Record<number, string> = {
+  3: 'stringSelect',
+  5: 'userSelect',
+  6: 'roleSelect',
+  7: 'mentionableSelect',
+  8: 'channelSelect',
+};
+
+interface RawComponentEmoji {
+  readonly id?: string | null;
+  readonly name?: string | null;
+  readonly animated?: boolean;
+}
+
+const summarizeEmoji = (emoji: RawComponentEmoji | undefined): Record<string, unknown> | undefined =>
+  emoji === undefined
+    ? undefined
+    : { name: emoji.name ?? null, id: emoji.id ?? null, animated: emoji.animated ?? false };
+
+/** Decodes a single raw (numeric) component into its friendly shape. */
+export const summarizeComponent = (component: unknown): Record<string, unknown> => {
+  if (typeof component !== 'object' || component === null) return {};
+  const c = component as Record<string, unknown>;
+  const type = typeof c.type === 'number' ? c.type : -1;
+  const nested = (value: unknown): Record<string, unknown>[] =>
+    Array.isArray(value) ? value.map(summarizeComponent) : [];
+
+  switch (type) {
+    case 1:
+      return { type: 'actionRow', components: nested(c.components) };
+    case 2:
+      return {
+        type: 'button',
+        style: BUTTON_STYLE_NAMES[typeof c.style === 'number' ? c.style : 0] ?? null,
+        label: c.label ?? null,
+        customId: c.custom_id ?? null,
+        url: c.url ?? null,
+        emoji: summarizeEmoji(c.emoji as RawComponentEmoji | undefined),
+        disabled: c.disabled ?? false,
+      };
+    case 3:
+    case 5:
+    case 6:
+    case 7:
+    case 8: {
+      const result: Record<string, unknown> = {
+        type: SELECT_TYPE_NAMES[type],
+        customId: c.custom_id ?? null,
+        placeholder: c.placeholder ?? null,
+        minValues: c.min_values,
+        maxValues: c.max_values,
+        disabled: c.disabled ?? false,
+      };
+      if (type === 3 && Array.isArray(c.options)) {
+        result.options = (c.options as Record<string, unknown>[]).map((option) => ({
+          label: option.label,
+          value: option.value,
+          description: option.description,
+          emoji: summarizeEmoji(option.emoji as RawComponentEmoji | undefined),
+          default: option.default ?? false,
+        }));
+      }
+      if (type === 8 && Array.isArray(c.channel_types)) {
+        result.channelTypes = (c.channel_types as number[]).map((code) => channelTypeName(code));
+      }
+      return result;
+    }
+    case 9:
+      return {
+        type: 'section',
+        components: nested(c.components),
+        accessory: c.accessory === undefined ? null : summarizeComponent(c.accessory),
+      };
+    case 10:
+      return { type: 'textDisplay', content: c.content ?? '' };
+    case 11:
+      return { type: 'thumbnail', media: c.media, description: c.description ?? null, spoiler: c.spoiler ?? false };
+    case 12: {
+      const items = Array.isArray(c.items)
+        ? (c.items as Record<string, unknown>[]).map((item) => ({
+            media: item.media,
+            description: item.description ?? null,
+            spoiler: item.spoiler ?? false,
+          }))
+        : [];
+      return { type: 'mediaGallery', items };
+    }
+    case 13:
+      return { type: 'file', file: c.file, spoiler: c.spoiler ?? false };
+    case 14:
+      return {
+        type: 'separator',
+        spacing: c.spacing === 2 ? 'large' : c.spacing === 1 ? 'small' : null,
+        divider: c.divider ?? true,
+      };
+    case 17:
+      return { type: 'container', accentColor: c.accent_color, spoiler: c.spoiler ?? false, components: nested(c.components) };
+    default:
+      return { type, ...c };
+  }
+};
+
+/** Decodes raw message components (numeric) into friendly shapes. */
+export const summarizeComponents = (components: readonly unknown[]): Record<string, unknown>[] =>
+  components.map(summarizeComponent);
+
+const attachmentName = (url: string): string | undefined => {
+  const prefix = 'attachment://';
+  return url.startsWith(prefix) ? url.slice(prefix.length) : undefined;
+};
+
+/** Filenames referenced by `attachment://` URLs anywhere in a component tree. */
+export const referencedAttachmentNames = (components: readonly TopLevelComponentInput[]): string[] => {
+  const names = new Set<string>();
+  const visit = (component: unknown): void => {
+    if (typeof component !== 'object' || component === null) return;
+    const c = component as {
+      media?: { url?: string };
+      file?: { url?: string };
+      items?: { media?: { url?: string } }[];
+      components?: unknown[];
+      accessory?: unknown;
+    };
+    const url = c.media?.url ?? c.file?.url;
+    if (typeof url === 'string') {
+      const name = attachmentName(url);
+      if (name !== undefined) names.add(name);
+    }
+    if (Array.isArray(c.items)) {
+      for (const item of c.items) {
+        const itemUrl = item?.media?.url;
+        if (typeof itemUrl === 'string') {
+          const name = attachmentName(itemUrl);
+          if (name !== undefined) names.add(name);
+        }
+      }
+    }
+    if (Array.isArray(c.components)) c.components.forEach(visit);
+    if (c.accessory !== undefined) visit(c.accessory);
+  };
+  components.forEach(visit);
+  return [...names];
+};
 
 /** Converts a friendly text input to Discord's numeric component JSON (type 4). */
 export const normalizeTextInput = (input: TextInputInput): Record<string, unknown> => ({

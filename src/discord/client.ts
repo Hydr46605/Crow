@@ -34,6 +34,7 @@ export type RequestExecutor = (
 export interface WebhookExecuteOptions {
   readonly body?: unknown;
   readonly query?: Record<string, string | number | boolean | undefined>;
+  readonly files?: readonly DiscordFile[];
 }
 
 /**
@@ -140,6 +141,20 @@ const createInteractionCallbackExecutor = (): InteractionCallbackExecutor => {
 
 const WEBHOOK_BASE = 'https://discord.com/api/webhooks';
 
+/** Builds a multipart webhook request when files are attached. */
+const buildWebhookMultipart = (body: unknown, files: readonly DiscordFile[]): RequestInit => {
+  const form = new FormData();
+  form.append('payload_json', JSON.stringify(body ?? {}));
+  files.forEach((file, index) => {
+    form.append(
+      `files[${index}]`,
+      new Blob([file.data], { type: file.contentType ?? 'application/octet-stream' }),
+      file.name,
+    );
+  });
+  return { method: 'POST', body: form };
+};
+
 const createWebhookExecutor = (): WebhookExecutor => {
   return async (webhookId, webhookToken, options) => {
     const url = new URL(`${WEBHOOK_BASE}/${webhookId}/${webhookToken}`);
@@ -149,11 +164,17 @@ const createWebhookExecutor = (): WebhookExecutor => {
       }
     }
 
-    const response = await fetchWithRetry(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
+    const files = options.files ?? [];
+    const init: RequestInit =
+      files.length > 0
+        ? buildWebhookMultipart(options.body, files)
+        : {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          };
+
+    const response = await fetchWithRetry(url, init);
 
     if (response.status === 204) return null;
 

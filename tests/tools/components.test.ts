@@ -6,6 +6,8 @@ import {
   isComponentsV2,
   normalizeComponents,
   normalizeTextInputs,
+  referencedAttachmentNames,
+  summarizeComponents,
   textInputSchema,
 } from '../../src/tools/components.js';
 
@@ -260,6 +262,53 @@ describe('textInputSchema', () => {
   it('accepts a valid short input', () => {
     const result = textInputSchema.safeParse({ customId: 'x', label: 'X', style: 'short', required: true });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('summarizeComponents', () => {
+  it('decodes numeric components to friendly shapes', () => {
+    const result = summarizeComponents([
+      { type: 1, components: [{ type: 2, style: 1, label: 'Go', custom_id: 'b' }] },
+      { type: 17, accent_color: 255, components: [{ type: 10, content: 'hi' }] },
+    ]);
+
+    expect(result).toEqual([
+      {
+        type: 'actionRow',
+        components: [
+          { type: 'button', style: 'primary', label: 'Go', customId: 'b', url: null, emoji: undefined, disabled: false },
+        ],
+      },
+      { type: 'container', accentColor: 255, spoiler: false, components: [{ type: 'textDisplay', content: 'hi' }] },
+    ]);
+  });
+
+  it('decodes a separator with an omitted spacing as null', () => {
+    expect(summarizeComponents([{ type: 14, divider: true }])).toEqual([
+      { type: 'separator', spacing: null, divider: true },
+    ]);
+  });
+});
+
+describe('referencedAttachmentNames', () => {
+  it('collects attachment:// filenames across the component tree', () => {
+    const names = referencedAttachmentNames([
+      { type: 'file', file: { url: 'attachment://a.pdf' } },
+      {
+        type: 'section',
+        components: [{ type: 'textDisplay', content: 'x' }],
+        accessory: { type: 'thumbnail', media: { url: 'attachment://b.png' } },
+      },
+      { type: 'mediaGallery', items: [{ media: { url: 'attachment://c.png' } }] },
+    ]);
+
+    expect(names).toEqual(['a.pdf', 'b.png', 'c.png']);
+  });
+
+  it('ignores external URLs', () => {
+    expect(
+      referencedAttachmentNames([{ type: 'mediaGallery', items: [{ media: { url: 'https://example.com/x.png' } }] }]),
+    ).toEqual([]);
   });
 });
 
