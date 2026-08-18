@@ -67,7 +67,12 @@ describe('summarizeMessage', () => {
       { type: 'rich', title: 'T', description: 'D', fields: [{ name: 'K', value: 'V', inline: true }] },
     ]);
     expect(summary.components).toEqual([
-      { type: 1, components: [{ type: 2, custom_id: 'b', label: 'Go' }] },
+      {
+        type: 'actionRow',
+        components: [
+          { type: 'button', style: null, label: 'Go', customId: 'b', url: null, emoji: undefined, disabled: false },
+        ],
+      },
     ]);
     expect(summary.attachments).toEqual([
       {
@@ -99,6 +104,26 @@ describe('summarizeMessage', () => {
       expect.objectContaining({ id: '2', content: 'reply target' }),
     );
   });
+
+  it('decodes a poll', () => {
+    const summary = summarizeMessage({
+      ...rawMessage,
+      poll: {
+        question: { text: 'Q?' },
+        answers: [{ answer_id: 1, poll_media: { text: 'Yes', emoji: { name: '👍', id: null } } }],
+        results: { is_finalized: true, answer_counts: [{ id: 1, count: 3, me_voted: true }] },
+      },
+    });
+
+    expect(summary.poll).toEqual({
+      question: 'Q?',
+      answers: [{ answerId: 1, text: 'Yes', emojiId: null, emojiName: '👍' }],
+      expiry: undefined,
+      allowMultiselect: undefined,
+      layoutType: undefined,
+      results: { isFinalized: true, answerCounts: [{ answerId: 1, count: 3, meVoted: true }] },
+    });
+  });
 });
 
 describe('buildMessageBody', () => {
@@ -115,6 +140,26 @@ describe('buildMessageBody', () => {
       attachments: [{ id: 0, filename: 'a.txt', description: undefined }],
     });
     expect(files).toEqual([{ name: 'a.txt', data: Buffer.from('hello'), contentType: 'text/plain' }]);
+  });
+});
+
+describe('buildMessageBody file-reference validation', () => {
+  it('rejects a component referencing an attachment that is not provided', async () => {
+    await expect(
+      buildMessageBody({
+        components: [{ type: 'file', file: { url: 'attachment://missing.pdf' } }],
+        attachments: [{ name: 'other.txt', data: 'aGk=' }],
+      }),
+    ).rejects.toThrow('no attachment is named "missing.pdf"');
+  });
+
+  it('accepts a component referencing a provided attachment', async () => {
+    const { body } = await buildMessageBody({
+      components: [{ type: 'file', file: { url: 'attachment://f.txt' } }],
+      attachments: [{ name: 'f.txt', data: 'aGk=' }],
+    });
+
+    expect(body.components).toEqual([{ type: 13, file: { url: 'attachment://f.txt' }, spoiler: undefined }]);
   });
 });
 
@@ -358,6 +403,31 @@ describe('editMessage with embeds', () => {
           ],
         },
       ],
+    });
+  });
+});
+
+describe('sendMessage with poll', () => {
+  it('includes the poll in the body', async () => {
+    let captured: RecordedRequest | undefined;
+    const discord = new DiscordClient('token', async (m, r, o) => {
+      captured = { m, r, o };
+      return rawMessage;
+    });
+
+    await sendMessage(
+      { channelId: '123456789012345678', poll: { question: 'Q?', answers: [{ text: 'Yes' }, { text: 'No' }] } },
+      createContext(discord),
+    );
+
+    expect(captured?.o.body.poll).toEqual({
+      question: { text: 'Q?' },
+      answers: [
+        { poll_media: { text: 'Yes', emoji: undefined } },
+        { poll_media: { text: 'No', emoji: undefined } },
+      ],
+      duration: undefined,
+      allow_multiselect: undefined,
     });
   });
 });

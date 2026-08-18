@@ -208,6 +208,22 @@ describe('executeWebhook', () => {
       flags: 32768,
     });
   });
+
+  it('resolves attachments into files and body.attachments', async () => {
+    let capturedOpts: { body?: Record<string, unknown>; files?: unknown[] } | undefined;
+    const discord = new DiscordClient('token', undefined, async (_id, _token, opts) => {
+      capturedOpts = opts;
+      return null;
+    });
+
+    await executeWebhook(
+      { webhookId: 'w1', webhookToken: 'tok', attachments: [{ name: 'a.txt', data: 'aGk=' }] },
+      createContext(discord),
+    );
+
+    expect(capturedOpts?.body?.attachments).toEqual([{ id: 0, filename: 'a.txt', description: undefined }]);
+    expect(capturedOpts?.files).toEqual([{ name: 'a.txt', data: Buffer.from('hi'), contentType: 'text/plain' }]);
+  });
 });
 
 describe('executeWebhookInput', () => {

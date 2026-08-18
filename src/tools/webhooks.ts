@@ -9,9 +9,11 @@ import {
   COMPONENTS_V2_FLAG,
   isComponentsV2,
   normalizeComponents,
+  referencedAttachmentNames,
 } from './components.js';
 import { requireConsent } from './consent.js';
 import { embedsSchema, normalizeEmbeds } from './embeds.js';
+import { attachmentsBody, attachmentsSchema, resolveAttachments } from './messages.js';
 import { errorResult, textResult } from './result.js';
 import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake } from './schemas.js';
 
@@ -54,6 +56,7 @@ export const executeWebhookInput = z
     tts: z.boolean().optional().describe('Whether this is a text-to-speech message.'),
     embeds: embedsSchema.optional(),
     components: componentsSchema.optional(),
+    attachments: attachmentsSchema.optional(),
     allowedMentions: allowedMentionsSchema,
     threadId: snowflake.optional().describe('Send to this thread within the channel.'),
     wait: z
@@ -62,10 +65,10 @@ export const executeWebhookInput = z
       .describe('Wait for the message to be created and return it (defaults to false).'),
   })
   .superRefine((args, ctx) => {
-    if (!args.content && !args.embeds && !args.components) {
+    if (!args.content && !args.embeds && !args.components && !args.attachments) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide at least one of "content", "embeds", or "components".',
+        message: 'Provide at least one of "content", "embeds", "components", or "attachments".',
       });
     }
     if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
@@ -199,27 +202,46 @@ export const executeWebhook = async (
   args: ExecuteWebhookArgs,
   ctx: CrowContext,
 ): Promise<CallToolResult> => {
-  const body: Record<string, unknown> = {};
-  if (args.content !== undefined) body.content = args.content;
-  if (args.username !== undefined) body.username = args.username;
-  if (args.avatarUrl !== undefined) body.avatar_url = args.avatarUrl;
-  if (args.tts !== undefined) body.tts = args.tts;
-  if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
-  if (args.components) {
-    body.components = normalizeComponents(args.components);
-    if (isComponentsV2(args.components)) body.flags = COMPONENTS_V2_FLAG;
-  }
-  if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
+  const result = await attempt('execute_webhook', async () => {
+    const files = args.attachments ? await resolveAttachments(args.attachments) : [];
 
-  const query: Record<string, string | number | boolean | undefined> = {
-    wait: args.wait,
-    thread_id: args.threadId,
-  };
-  if (args.components) query.with_components = true;
+    if (args.components && args.attachments) {
+      const referenced = referencedAttachmentNames(args.components);
+      if (referenced.length > 0) {
+        const names = new Set(files.map((file) => file.name));
+        for (const name of referenced) {
+          if (!names.has(name)) {
+            throw new Error(`Component references "attachment://${name}" but no attachment is named "${name}".`);
+          }
+        }
+      }
+    }
 
-  const result = await attempt('execute_webhook', () =>
-    ctx.discord.executeWebhook<unknown>(args.webhookId, args.webhookToken, { body, query }),
-  );
+    const body: Record<string, unknown> = {};
+    if (args.content !== undefined) body.content = args.content;
+    if (args.username !== undefined) body.username = args.username;
+    if (args.avatarUrl !== undefined) body.avatar_url = args.avatarUrl;
+    if (args.tts !== undefined) body.tts = args.tts;
+    if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
+    if (args.components) {
+      body.components = normalizeComponents(args.components);
+      if (isComponentsV2(args.components)) body.flags = COMPONENTS_V2_FLAG;
+    }
+    if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
+    if (args.attachments) body.attachments = attachmentsBody(args.attachments, files);
+
+    const query: Record<string, string | number | boolean | undefined> = {
+      wait: args.wait,
+      thread_id: args.threadId,
+    };
+    if (args.components) query.with_components = true;
+
+    return ctx.discord.executeWebhook<unknown>(args.webhookId, args.webhookToken, {
+      body,
+      query,
+      files: files.length > 0 ? files : undefined,
+    });
+  });
   if (!result.ok) return errorResult(result.error);
 
   if (args.wait) return textResult(JSON.stringify(result.value, null, 2));
@@ -284,7 +306,8 @@ export const registerWebhookTools = (server: McpServer, ctx: CrowContext): void 
       title: 'Execute webhook',
       description:
         'Send a message through a webhook using its token. Supports content, embeds, components, ' +
-        'a custom username/avatar, TTS, and thread targeting. The webhook token is never logged.',
+        'file attachments, a custom username/avatar, TTS, and thread targeting. The webhook token ' +
+        'is never logged.',
       inputSchema: executeWebhookInput,
     },
     async (args) => executeWebhook(args, ctx),

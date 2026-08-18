@@ -11,6 +11,8 @@ import {
   COMPONENTS_V2_FLAG,
   isComponentsV2,
   normalizeComponents,
+  referencedAttachmentNames,
+  summarizeComponents,
   type ComponentsInput,
 } from './components.js';
 import { requireConsent } from './consent.js';
@@ -22,6 +24,7 @@ import {
   type EmbedSummary,
   type RawEmbed,
 } from './embeds.js';
+import { normalizePoll, pollSchema, summarizePoll, type PollInput, type RawPoll } from './polls.js';
 import { errorResult, textResult } from './result.js';
 import { allowedMentionsSchema, consent, normalizeAllowedMentions, snowflake, type AllowedMentionsInput } from './schemas.js';
 
@@ -73,21 +76,26 @@ const sendMessageInput = z
     embeds: embedsSchema.optional(),
     components: componentsSchema.optional(),
     attachments: attachmentsSchema.optional(),
+    poll: pollSchema.optional(),
     allowedMentions: allowedMentionsSchema,
     tts: z.boolean().optional().describe('Whether this is a text-to-speech message.'),
     replyTo: snowflake.optional().describe('The ID of the message to reply to.'),
   })
   .superRefine((args, ctx) => {
-    if (!args.content && !args.embeds && !args.attachments) {
+    if (!args.content && !args.embeds && !args.attachments && !args.components && !args.poll) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Provide "content", "embeds", "attachments", or a combination.',
+        message: 'Provide "content", "embeds", "attachments", "components", "poll", or a combination.',
       });
     }
-    if (args.components && isComponentsV2(args.components) && (args.content !== undefined || args.embeds !== undefined)) {
+    if (
+      args.components &&
+      isComponentsV2(args.components) &&
+      (args.content !== undefined || args.embeds !== undefined || args.poll !== undefined)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Components V2 messages cannot include "content" or "embeds".',
+        message: 'Components V2 messages cannot include "content", "embeds", or "poll".',
       });
     }
   });
@@ -213,6 +221,7 @@ export interface RawMessage {
   readonly edited_timestamp?: string | null;
   readonly embeds?: readonly RawEmbed[];
   readonly components?: readonly unknown[];
+  readonly poll?: RawPoll;
   readonly attachments?: readonly RawAttachment[];
   readonly sticker_items?: readonly RawStickerItem[];
   readonly referenced_message?: RawMessage | null;
@@ -261,6 +270,7 @@ export interface MessageSummary {
   readonly editedAt?: string | null;
   readonly embeds?: readonly EmbedSummary[];
   readonly components?: readonly unknown[];
+  readonly poll?: Record<string, unknown>;
   readonly attachments?: readonly AttachmentSummary[];
   readonly stickerItems?: readonly StickerItemSummary[];
   readonly referencedMessage?: MessageSummary | null;
@@ -283,7 +293,8 @@ export const summarizeMessage = (message: RawMessage): MessageSummary => ({
   tts: message.tts,
   editedAt: message.edited_timestamp ?? null,
   embeds: message.embeds?.map(summarizeEmbed),
-  components: message.components,
+  components: message.components ? summarizeComponents(message.components) : undefined,
+  poll: message.poll ? summarizePoll(message.poll) : undefined,
   attachments: message.attachments?.map((attachment) => ({
     id: attachment.id,
     filename: attachment.filename,
@@ -312,7 +323,7 @@ export const summarizeMessage = (message: RawMessage): MessageSummary => ({
   mentionUsers: message.mention_users,
 });
 
-const resolveAttachments = async (
+export const resolveAttachments = async (
   attachments: readonly { name?: string; path?: string; url?: string; data?: string }[],
 ): Promise<DiscordFile[]> => {
   const files: DiscordFile[] = [];
@@ -323,7 +334,7 @@ const resolveAttachments = async (
   return files;
 };
 
-const attachmentsBody = (
+export const attachmentsBody = (
   attachments: readonly { description?: string }[],
   files: readonly DiscordFile[],
 ): { id: number; filename?: string; description?: string }[] =>
@@ -348,6 +359,7 @@ export interface BuildMessageBodyArgs {
   readonly embeds?: EmbedInput[];
   readonly components?: ComponentsInput;
   readonly attachments?: readonly MessageAttachmentInput[];
+  readonly poll?: PollInput;
   readonly allowedMentions?: AllowedMentionsInput;
   readonly tts?: boolean;
   readonly replyTo?: string;
@@ -363,6 +375,18 @@ export const buildMessageBody = async (
 ): Promise<{ body: Record<string, unknown>; files: DiscordFile[] }> => {
   const files = args.attachments ? await resolveAttachments(args.attachments) : [];
 
+  if (args.components && args.attachments) {
+    const referenced = referencedAttachmentNames(args.components);
+    if (referenced.length > 0) {
+      const names = new Set(files.map((file) => file.name));
+      for (const name of referenced) {
+        if (!names.has(name)) {
+          throw new Error(`Component references "attachment://${name}" but no attachment is named "${name}".`);
+        }
+      }
+    }
+  }
+
   const body: Record<string, unknown> = {};
   if (args.content !== undefined) body.content = args.content;
   if (args.embeds) body.embeds = normalizeEmbeds(args.embeds);
@@ -370,6 +394,7 @@ export const buildMessageBody = async (
     body.components = normalizeComponents(args.components);
     if (isComponentsV2(args.components)) body.flags = COMPONENTS_V2_FLAG;
   }
+  if (args.poll) body.poll = normalizePoll(args.poll);
   if (args.allowedMentions) body.allowed_mentions = normalizeAllowedMentions(args.allowedMentions);
   if (args.tts !== undefined) body.tts = args.tts;
   if (args.replyTo) body.message_reference = { message_id: args.replyTo };
@@ -425,6 +450,7 @@ export const sendMessage = async (
       embeds: args.embeds,
       components: args.components,
       attachments: args.attachments,
+      poll: args.poll,
       allowedMentions: args.allowedMentions,
       tts: args.tts,
       replyTo: args.replyTo,
@@ -533,8 +559,9 @@ export const registerMessageTools = (server: McpServer, ctx: CrowContext): void 
     {
       title: 'Send message',
       description:
-        'Send a message to a Discord channel with content, embeds, components (buttons, select ' +
-        'menus), and/or file attachments. Optionally reply to a message, set allowed mentions, or use TTS.',
+        'Send a message to a Discord channel with content, embeds, components (V1 action rows or ' +
+        'V2 layout components), a poll, and/or file attachments. Optionally reply to a message, ' +
+        'set allowed mentions, or use TTS.',
       inputSchema: sendMessageInput,
     },
     async (args) => sendMessage(args, ctx),
