@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0] - 2026-08-18
+### Added
+- Blocklist ("guardrails"): block tools by name, by category (`destructive`, `write`, `open_world`), by raw REST route glob, or by whole guild. Rules persist in `~/.crow/blocklist.json` with `CROW_BLOCK_*` environment overrides; blocked tools stay listed but refuse on call with a clear reason.
+- `wait_for_message`: block and watch a channel until a new message arrives (optionally from a specific user), so an agent can "listen" in a channel and reply via `send_message`.
+- Polls: `poll` on `send_message`, poll decoding in message summaries, plus `get_poll_answer_voters` and `end_poll`.
+- Components V2 reading: message summaries now decode components back to friendly shapes (action rows, buttons, selects, containers, sections, text, media galleries, thumbnails, files, separators).
+- File uploads: `execute_webhook` now supports file attachments (multipart); V2 `file`/thumbnail/media components validate their `attachment://` references against uploaded files; the content-type table is broadened.
+- Auto-moderation: `list_automod_rules`, `get_automod_rule`, `create_automod_rule`, `modify_automod_rule`, and `delete_automod_rule` (consent-gated).
+- Scheduled events: `list_scheduled_events`, `get_scheduled_event`, `create_scheduled_event`, `modify_scheduled_event`, `delete_scheduled_event` (consent-gated), and `get_scheduled_event_users`.
+- Moderation: `timeout_member`, `remove_timeout_member`, `set_member_nickname`, `reset_member_nickname`, `disconnect_member_from_voice`, `move_member_to_voice`, and the read-only `get_prune_count`.
+### Fixed
+- `get_welcome_screen` reports a clear message when a guild has no welcome screen configured instead of surfacing a raw "Unknown Guild Welcome Screen" error.
+- `modify_welcome_screen` requires at least one welcome channel when enabling, requires a description per channel, and rejects combining `emojiId` with `emojiName`.
+- `separator` spacing is now omitted when unset instead of being forced to "small".
+### Changed
+- `modify_member` is now the generic fallback; timeout, nickname, and voice movement have dedicated tools with clear intent.
+- Components V2 messages now also reject a `poll` alongside `content` and `embeds`.
+
 ## [1.2.0] - 2026-08-17
 ### Added
 - Message Components V2: messages can now be sent and read back with layout components (container, section, text display, separator, media gallery, thumbnail, and file). V2 layout is detected automatically and tagged with the `IS_COMPONENTS_V2` flag; V1 action rows and select menus keep working unchanged.

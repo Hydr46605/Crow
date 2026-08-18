@@ -11,8 +11,8 @@ A tool module exports:
 2. `register<Name>Tool(s)(server, ctx)` functions that bind the handlers to the MCP server with a
    Zod input schema.
 
-`ctx` is the shared `CrowContext` (`config`, `discord` REST client, `actions` runtime, and `notes`
-store) handed to every handler.
+`ctx` is the shared `CrowContext` (`config`, `discord` REST client, `actions` runtime, `notes`
+store, and `blocklist` runtime) handed to every handler.
 All Discord HTTP flows through the single `DiscordClient`, which adds auth, rate limiting, and
 token redaction on errors. Handlers normalize errors with the `attempt` helper.
 
@@ -25,6 +25,7 @@ Shared building blocks live alongside the tools:
 - `files.ts`: file-source resolution (path/url/data) with size limits and content-type inference.
 - `actions/`: the action registry plus the pure `resolveInteraction` hook.
 - `notes/`: the local informational note store (schema, file persistence, runtime).
+- `blocklist/`: the guardrail schema, file store, and matching runtime.
 - `gateway/`: the Gateway connection (heartbeat, resume, reconnect) and the interaction daemon.
 
 ## Selection pipeline
@@ -66,8 +67,19 @@ values users submit (selected menu options and modal inputs) are logged and read
 
 Destructive tools require an explicit `"confirm": true` argument. Without it they return an error
 and take no action. This applies to `kick_member`, `ban_member`, `delete_channel`, `delete_message`,
-`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`, and
-`bulk_delete_messages`.
+`delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`,
+`delete_automod_rule`, `delete_scheduled_event`, and `bulk_delete_messages`.
+
+## Blocklist (guardrails)
+
+A blocklist can forbid the agent from using specific tools, whole tool categories, raw REST
+routes, or entire guilds. Rules live in `~/.crow/blocklist.json` and are merged with
+`CROW_BLOCK_TOOLS`, `CROW_BLOCK_CATEGORIES`, `CROW_BLOCK_ROUTES`, and `CROW_BLOCK_GUILDS`
+environment overrides. Categories map onto tool annotations: `destructive` (destructiveHint),
+`write` (any non-read-only tool), and `open_world` (the `discord_request` escape hatch). Raw
+routes match `discord_request` with a method plus a segment glob (`*` one segment, `**` any),
+e.g. `DELETE:/channels/*/messages/*`. Blocked tools stay listed but refuse on call with a clear
+reason, and the guard is enforced once at the `registerTools` boundary.
 
 ## Annotations
 
@@ -77,14 +89,17 @@ Every tool carries MCP annotations so clients can reason about safety without re
   set `readOnlyHint`.
 - Destructive tools (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
   `delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`,
-  `bulk_delete_messages`) set `destructiveHint`.
+  `delete_automod_rule`, `delete_scheduled_event`, `bulk_delete_messages`) set `destructiveHint`.
 - Idempotent writes (`edit_message`, `modify_channel`, `modify_thread`, `modify_guild`,
   `modify_webhook`, `modify_emoji`, `modify_sticker`, `edit_channel_permissions`, `modify_role`,
   `modify_member`, `modify_current_user`, `modify_current_member`, `modify_voice_state`,
   `modify_welcome_screen`, `modify_onboarding`,
   `modify_member_verification`, `add_role_to_member`, `remove_role_from_member`, `add_reaction`,
   `remove_own_reaction`, `remove_user_reaction`, `pin_message`, `unpin_message`, `unban_member`,
-  `register_action`, `remove_action`, `add_note`, `remove_note`, `clear_notes`) set `idempotentHint`.
+  `timeout_member`, `remove_timeout_member`, `set_member_nickname`, `reset_member_nickname`,
+  `disconnect_member_from_voice`, `move_member_to_voice`, `modify_automod_rule`,
+  `modify_scheduled_event`, `register_action`, `remove_action`, `add_note`, `remove_note`,
+  `clear_notes`) set `idempotentHint`.
 - `discord_request` sets `openWorldHint` because it can reach any endpoint.
 
 Each tool also has a human-readable `title` and per-field descriptions in its input schema.
@@ -111,7 +126,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
 | `read_messages` | `channelId`, `limit?`, `before?`, `after?`, `around?` | Read recent channel messages. |
-| `send_message` | `channelId`, `content?`, `embeds?`, `components?`, `attachments?`, `allowedMentions?`, `tts?`, `replyTo?` | Send a channel message. |
+| `send_message` | `channelId`, `content?`, `embeds?`, `components?`, `attachments?`, `poll?`, `allowedMentions?`, `tts?`, `replyTo?` | Send a channel message. |
+| `wait_for_message` | `channelId`, `after?`, `userId?`, `timeoutSeconds?`, `pollIntervalSeconds?` | Block and watch a channel until a new message arrives. |
 | `edit_message` | `channelId`, `messageId`, `content?`, `embeds?`, `components?`, `attachments?` | Edit a message. |
 | `delete_message` | `channelId`, `messageId`, `confirm` | Delete a message (consent-gated). |
 | `pin_message` | `channelId`, `messageId` | Pin a message in a channel. |
@@ -149,7 +165,7 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `create_webhook` | `channelId`, `name`, `avatar?` | Create a webhook in a channel. |
 | `modify_webhook` | `webhookId`, `name?`, `avatar?`, `channelId?` | Modify a webhook. |
 | `delete_webhook` | `webhookId`, `confirm` | Delete a webhook (consent-gated). |
-| `execute_webhook` | `webhookId`, `webhookToken`, `content?`, `embeds?`, `components?`, `username?`, `avatarUrl?`, `tts?`, `allowedMentions?`, `threadId?`, `wait?` | Send a message through a webhook token. |
+| `execute_webhook` | `webhookId`, `webhookToken`, `content?`, `embeds?`, `components?`, `attachments?`, `username?`, `avatarUrl?`, `tts?`, `allowedMentions?`, `threadId?`, `wait?` | Send a message through a webhook token. |
 
 ### Invites
 | Tool | Inputs | Purpose |
@@ -192,7 +208,13 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 ### Member management
 | Tool | Inputs | Purpose |
 | --- | --- | --- |
-| `modify_member` | `guildId`, `userId`, `nick?`, `mute?`, `deaf?`, `channelId?`, `timeoutUntil?`, `reason?` | Modify a member (nickname, voice, timeout). |
+| `modify_member` | `guildId`, `userId`, `nick?`, `mute?`, `deaf?`, `channelId?`, `timeoutUntil?`, `reason?` | Generic member edit (nickname, voice, timeout); prefer the dedicated tools below. |
+| `timeout_member` | `guildId`, `userId`, `durationMinutes`, `reason?` | Time out a member for a number of minutes. |
+| `remove_timeout_member` | `guildId`, `userId`, `reason?` | Lift a member's timeout early. |
+| `set_member_nickname` | `guildId`, `userId`, `nick`, `reason?` | Set a member's nickname. |
+| `reset_member_nickname` | `guildId`, `userId`, `reason?` | Reset a member's nickname. |
+| `disconnect_member_from_voice` | `guildId`, `userId`, `reason?` | Disconnect a member from voice. |
+| `move_member_to_voice` | `guildId`, `userId`, `channelId`, `reason?` | Move a member to a voice channel. |
 | `add_role_to_member` | `guildId`, `userId`, `roleId` | Assign a role to a member. |
 | `remove_role_from_member` | `guildId`, `userId`, `roleId` | Remove a role from a member. |
 
@@ -268,6 +290,32 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `kick_member` | `guildId`, `userId`, `confirm`, `reason?` | Kick a member (consent-gated). |
 | `ban_member` | `guildId`, `userId`, `confirm`, `deleteMessageDays?`, `reason?` | Ban a member (consent-gated). |
 | `unban_member` | `guildId`, `userId`, `reason?` | Remove a ban. |
+| `get_prune_count` | `guildId`, `days?`, `includeRoles?` | Count members that would be pruned (read-only). |
+
+### Polls
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `get_poll_answer_voters` | `channelId`, `messageId`, `answerId`, `after?`, `limit?` | List the users who voted for an answer. |
+| `end_poll` | `channelId`, `messageId` | End a poll immediately and return the message. |
+
+### Automod
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_automod_rules` | `guildId` | List a guild's auto-moderation rules. |
+| `get_automod_rule` | `guildId`, `ruleId` | Get a single auto-moderation rule. |
+| `create_automod_rule` | `guildId`, `name`, `eventType`, `triggerType`, `actions`, plus trigger metadata | Create an auto-moderation rule. |
+| `modify_automod_rule` | `guildId`, `ruleId`, plus optional rule fields | Modify an auto-moderation rule. |
+| `delete_automod_rule` | `guildId`, `ruleId`, `confirm` | Delete an auto-moderation rule (consent-gated). |
+
+### Scheduled events
+| Tool | Inputs | Purpose |
+| --- | --- | --- |
+| `list_scheduled_events` | `guildId` | List a guild's scheduled events. |
+| `get_scheduled_event` | `guildId`, `eventId` | Get a single scheduled event. |
+| `create_scheduled_event` | `guildId`, `name`, `entityType`, `scheduledStartTime`, plus channel/location | Create a scheduled event. |
+| `modify_scheduled_event` | `guildId`, `eventId`, plus optional event fields | Modify a scheduled event. |
+| `delete_scheduled_event` | `guildId`, `eventId`, `confirm` | Delete a scheduled event (consent-gated). |
+| `get_scheduled_event_users` | `guildId`, `eventId`, `limit?`, `before?`, `after?` | List users interested in an event. |
 
 ### Raw
 | Tool | Inputs | Purpose |
@@ -300,3 +348,8 @@ Each tool also has a human-readable `title` and per-field descriptions in its in
 | `notes` | done | Local informational notes attached to Discord objects. |
 | `overview` | done | One-call guild orientation. |
 | `interaction-values` | done | Capture and substitute submitted select/modal values. |
+| `blocklist` | done | Guardrails that block tools by name, category, route, or guild. |
+| `wait` | done | Block until a new message arrives in a channel. |
+| `polls` | done | Create polls, list voters, and end polls. |
+| `automod` | done | Manage auto-moderation rules. |
+| `scheduled-events` | done | Manage guild scheduled events and their interested users. |

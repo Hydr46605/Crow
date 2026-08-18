@@ -42,7 +42,7 @@ and registering it.
 - **Channels**: full control: text/voice/forum settings, threads, forum posts, and permission overwrites.
 - **Guild config**: set the guild name, description, and rules channel.
 - **Roles**: create, modify, and delete roles; assign and remove them from members.
-- **Members**: edit nicknames, voice state, and timeouts.
+- **Members**: dedicated tools for timeouts, nicknames, and voice movement, plus role assignment.
 - **Self**: read and modify the bot's own profile (username, avatar, banner, bio) and its per-guild member profile (nickname, guild avatar/banner/bio).
 - **Voice**: read and modify stage-channel voice states (suppress, request-to-speak, and move between stage channels).
 - **Reactions**: add, remove, and list message reactions.
@@ -56,12 +56,18 @@ and registering it.
 - **Stickers**: create, list, modify, and delete guild stickers, plus sticker packs.
 - **Actions**: register replies and modals for component interactions, and inspect the values users submit.
 - **Gateway**: `crow gateway` daemon receives interactions live and dispatches registered actions.
-- **Moderation**: kick and ban behind an explicit consent gate; list and unban.
+- **Moderation**: kick and ban behind an explicit consent gate; list, unban, and count prunable members.
+- **Automod**: create, list, modify, and delete auto-moderation rules.
+- **Scheduled events**: create, list, modify, and delete guild scheduled events and list interested users.
+- **Polls**: attach polls to messages, list voters, and end polls.
+- **Listening**: `wait_for_message` blocks until a new message arrives in a channel.
+- **Guardrails**: block tools by name, category, raw REST route, or whole guild.
 - **Raw REST**: a generic Discord REST escape hatch for any endpoint the typed tools do not cover.
 
 Destructive actions (`kick_member`, `ban_member`, `delete_channel`, `delete_message`,
 `delete_webhook`, `delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`,
-`bulk_delete_messages`) require an explicit `"confirm": true` consent flag.
+`delete_automod_rule`, `delete_scheduled_event`, `bulk_delete_messages`) require an explicit
+`"confirm": true` consent flag.
 
 Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) plus human-readable titles and per-field descriptions, so clients can present and
@@ -74,13 +80,13 @@ permission the tools safely.
 | Health | `ping` |
 | Discovery | `list_guilds`, `get_guild`, `list_members`, `get_member`, `list_channels`, `get_channel` |
 | Overview | `get_guild_overview` |
-| Messaging | `read_messages`, `send_message`, `edit_message`, `delete_message`, `pin_message`, `unpin_message`, `bulk_delete_messages` |
+| Messaging | `read_messages`, `send_message`, `wait_for_message`, `edit_message`, `delete_message`, `pin_message`, `unpin_message`, `bulk_delete_messages` |
 | Direct messages | `list_dm_channels`, `get_dm_channel`, `send_dm`, `read_dm_messages` |
 | Embeds | `create_embed` |
 | Channels & threads | `modify_channel`, `create_channel`, `delete_channel`, `list_active_threads`, `list_archived_threads`, `create_thread`, `modify_thread`, `edit_channel_permissions`, `delete_channel_permissions` |
 | Guild config | `modify_guild` |
 | Roles | `list_roles`, `create_role`, `modify_role`, `delete_role` |
-| Members | `modify_member`, `add_role_to_member`, `remove_role_from_member` |
+| Members | `modify_member`, `timeout_member`, `remove_timeout_member`, `set_member_nickname`, `reset_member_nickname`, `disconnect_member_from_voice`, `move_member_to_voice`, `add_role_to_member`, `remove_role_from_member` |
 | Self | `get_current_user`, `modify_current_user`, `modify_current_member` |
 | Voice | `get_voice_state`, `modify_voice_state` |
 | Reactions | `add_reaction`, `remove_own_reaction`, `remove_user_reaction`, `list_reactions` |
@@ -93,7 +99,10 @@ permission the tools safely.
 | Stickers | `list_stickers`, `get_sticker`, `list_sticker_packs`, `get_sticker_pack`, `create_sticker`, `modify_sticker`, `delete_sticker` |
 | Actions | `register_action`, `list_actions`, `remove_action`, `list_recent_interactions` |
 | Notes | `add_note`, `list_notes`, `remove_note`, `clear_notes` |
-| Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member` |
+| Moderation | `list_bans`, `get_ban`, `kick_member`, `ban_member`, `unban_member`, `get_prune_count` |
+| Polls | `get_poll_answer_voters`, `end_poll` |
+| Automod | `list_automod_rules`, `get_automod_rule`, `create_automod_rule`, `modify_automod_rule`, `delete_automod_rule` |
+| Scheduled events | `list_scheduled_events`, `get_scheduled_event`, `create_scheduled_event`, `modify_scheduled_event`, `delete_scheduled_event`, `get_scheduled_event_users` |
 | Raw | `discord_request` |
 
 See [docs/tools.md](./docs/tools.md) for the full reference, the selection pipeline, and the

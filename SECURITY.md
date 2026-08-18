@@ -25,9 +25,14 @@ The following tools are destructive and require an explicit `"confirm": true` co
 Without consent they return an error and perform no action:
 
 `kick_member`, `ban_member`, `delete_channel`, `delete_message`, `delete_webhook`,
-`delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`, and `bulk_delete_messages`.
+`delete_invite`, `delete_emoji`, `delete_sticker`, `delete_role`, `delete_automod_rule`,
+`delete_scheduled_event`, and `bulk_delete_messages`.
 
 ## Least privilege
 
 Grant the bot only the permissions its tasks actually require. Prefer read-only tools, and check
 each tool's annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) before acting.
+
+A blocklist in `~/.crow/blocklist.json` (with `CROW_BLOCK_*` environment overrides) can hard-block
+tools by name, category, raw REST route, or whole guild — a guardrail for cases where the agent
+should never be able to reach a capability at all.
