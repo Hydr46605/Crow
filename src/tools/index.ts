@@ -3,6 +3,7 @@ import { installBlocklistGuard } from '../blocklist/guard.js';
 import type { CrowContext } from '../context.js';
 import { registerActionTools } from './actions.js';
 import { registerAuditLogTools } from './audit-log.js';
+import { registerAutomodTools } from './automod.js';
 import { registerBoostTools } from './boost.js';
 import { registerChannelTools } from './channels.js';
 import { registerCommunityTools } from './community.js';
@@ -17,10 +18,12 @@ import { registerModerationTools } from './moderation.js';
 import { registerNoteTools } from './notes.js';
 import { registerOverviewTools } from './overview.js';
 import { registerPingTool } from './ping.js';
+import { registerPollTools } from './polls.js';
 import { registerProfileTools } from './profile.js';
 import { registerRawTool } from './raw.js';
 import { registerReactionTools } from './reactions.js';
 import { registerRoleTools } from './roles.js';
+import { registerScheduledEventTools } from './scheduled-events.js';
 import { registerStickerTools } from './stickers.js';
 import { registerVoiceTools } from './voice.js';
 import { registerWaitTool } from './wait.js';
@@ -40,14 +43,17 @@ const registrars: readonly ToolRegistrar[] = [
   registerMemberTools,
   registerMessageTools,
   registerWaitTool,
+  registerPollTools,
   registerChannelTools,
   registerCommunityTools,
+  registerScheduledEventTools,
   registerDmTools,
   registerRoleTools,
   registerReactionTools,
   registerAuditLogTools,
   registerBoostTools,
   registerModerationTools,
+  registerAutomodTools,
   registerProfileTools,
   registerEmbedTools,
   registerWebhookTools,
