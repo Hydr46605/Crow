@@ -23,6 +23,7 @@ import { registerReactionTools } from './reactions.js';
 import { registerRoleTools } from './roles.js';
 import { registerStickerTools } from './stickers.js';
 import { registerVoiceTools } from './voice.js';
+import { registerWaitTool } from './wait.js';
 import { registerWebhookTools } from './webhooks.js';
 
 export type ToolRegistrar = (server: McpServer, ctx: CrowContext) => void;
@@ -38,6 +39,7 @@ const registrars: readonly ToolRegistrar[] = [
   registerOverviewTools,
   registerMemberTools,
   registerMessageTools,
+  registerWaitTool,
   registerChannelTools,
   registerCommunityTools,
   registerDmTools,
